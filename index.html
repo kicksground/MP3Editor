@@ -88,6 +88,9 @@
   button.primary:hover:not(:disabled) { background: #3d7bf0; }
   button.green { background: var(--accent2); border-color: var(--accent2); color: #06281c; font-weight: 600; }
   button.green:hover:not(:disabled) { background: #2fb583; }
+  button.rec { background: var(--danger); border-color: var(--danger); color: #fff; font-weight: 600; animation: recblink 1.2s ease-in-out infinite; }
+  button.rec:hover:not(:disabled) { background: #e85555; }
+  @keyframes recblink { 50% { opacity: .75; } }
   select, input[type=range] { accent-color: var(--accent); }
   select {
     background: var(--panel2); color: var(--text);
@@ -145,6 +148,7 @@
     <span class="big">🎧</span>
     오디오 파일을 여기로 <b>드래그</b>하거나 <b>클릭</b>해서 선택하세요<br>
     <span style="font-size:13px">MP3 · WAV · M4A · AAC · OGG · 동영상(MP4)의 소리 지원</span>
+    <div style="margin-top:20px"><button id="btn-record-dz">🎙️ 마이크로 바로 녹음하기</button></div>
     <input type="file" id="fileinput" accept="audio/*,video/*" hidden>
   </div>
 
@@ -169,6 +173,8 @@
       <span class="divider"></span>
       <button id="btn-undo">↩️ 실행 취소</button>
       <button id="btn-redo">↪️ 다시 실행</button>
+      <span class="divider"></span>
+      <button id="btn-record">🎙️ 녹음</button>
       <span style="flex:1"></span>
       <span class="label" style="min-width:auto">보기</span>
       <button id="btn-zoomin">🔍＋</button>
@@ -235,6 +241,7 @@
       &nbsp;·&nbsp; <b>⬇️ 선택을 새 클립으로</b>: 원본은 그대로 두고 선택 부분을 아래 클립으로 복사해 따로 편집·저장합니다. 여러 번 눌러 계속 추가할 수 있어요.
       &nbsp;·&nbsp; <b>🔗 이어 붙이기</b>: ‘이어 붙이기 포함’에 체크된 클립들을 화면 위에서부터 순서대로 연결한 새 클립을 만듭니다. 옆의 <b>사이 무음</b>을 고르면 클립 사이마다 그만큼의 조용한 간격이 들어가요.
       &nbsp;·&nbsp; 클립 왼쪽 위의 <b>⠿ 손잡이를 드래그</b>하면 클립 순서를 바꿀 수 있고, <b>✏️</b>로 클립 이름을 바꿀 수 있습니다. 클립마다 색이 달라 구분하기 쉬워요.
+      &nbsp;·&nbsp; <b>🎙️ 녹음</b>: 파일 없이 시작하면 녹음이 원본으로 열리고, 편집 중이면 새 클립으로 추가됩니다. 처음 사용할 때 브라우저의 마이크 권한 요청을 ‘허용’해 주세요.
       &nbsp;·&nbsp; 파형의 <b style="color:var(--danger)">빨간 부분</b>은 소리가 최대 한계에 닿아 잘린(클리핑) 곳입니다.
       &nbsp;·&nbsp; 저장 시 Chrome에서는 폴더를 직접 고를 수 있고, 위치 선택을 지원하지 않는 브라우저(Safari 등)는 다운로드 폴더에 저장됩니다.
     </div>
@@ -1006,6 +1013,81 @@ $("btn-voice").addEventListener("click", async () => {
     alert("이 브라우저에서는 목소리 강조 기능을 사용할 수 없습니다.\n(" + err + ")");
   }
 });
+
+// ---------- 마이크 녹음 ----------
+// 파일을 열기 전이면 녹음이 원본 편집기로, 편집 중이면 새 클립으로 들어간다
+let recState = null; // { rec, chunks, stream, startAt, timer }
+let recCounter = 0;
+
+function updateRecUI() {
+  const running = !!recState;
+  const t = running ? fmt((Date.now() - recState.startAt) / 1000) : "";
+  const b1 = $("btn-record"), b2 = $("btn-record-dz");
+  b1.textContent = running ? "⏺ 녹음 중지 (" + t + ")" : "🎙️ 녹음";
+  b2.textContent = running ? "⏺ 녹음 중지 (" + t + ")" : "🎙️ 마이크로 바로 녹음하기";
+  b1.classList.toggle("rec", running);
+  b2.classList.toggle("rec", running);
+}
+
+async function toggleRecord() {
+  if (recState) { recState.rec.stop(); return; } // 녹음 중이면 중지
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+    alert("이 브라우저에서는 녹음을 지원하지 않습니다. Chrome 또는 Safari 최신 버전을 사용해 주세요.");
+    return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    alert("마이크를 사용할 수 없습니다.\n브라우저가 마이크 권한을 물어보면 ‘허용’을 눌러 주세요.\n(맥 설정 → 개인정보 보호 및 보안 → 마이크에서 브라우저 허용도 확인)\n\n" + err);
+    return;
+  }
+  let mime = "";
+  for (const m of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]) {
+    if (MediaRecorder.isTypeSupported(m)) { mime = m; break; }
+  }
+  const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  const chunks = [];
+  rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  rec.onstop = async () => {
+    clearInterval(recState.timer);
+    stream.getTracks().forEach(tr => tr.stop());
+    recState = null;
+    updateRecUI();
+    try {
+      ensureCtx();
+      const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+      const buf = await blob.arrayBuffer();
+      const decoded = await new Promise((res, rej) => actx.decodeAudioData(buf, res, rej));
+      const chs = [];
+      const nch = Math.min(2, decoded.numberOfChannels);
+      for (let c = 0; c < nch; c++) chs.push(new Float32Array(decoded.getChannelData(c)));
+      recCounter++;
+      if (!main.channels.length) {
+        // 아직 파일이 없으면 녹음을 원본으로 연다
+        $("fname").textContent = "🎙️ 녹음 " + recCounter;
+        dropzone.style.display = "none";
+        $("editor").style.display = "block";
+        main.setAudio(chs, decoded.sampleRate, "녹음" + recCounter);
+        focusedEditor = main;
+        status("🎙️ 녹음이 끝났습니다 (" + fmt(main.duration()) + "). 바로 편집할 수 있어요.");
+      } else {
+        // 편집 중이면 녹음이 새 클립으로 추가된다
+        const ed = createClip(chs, decoded.sampleRate, "마이크", "녹음", "마이크 녹음");
+        ed.fileName = "녹음" + clipCounter;
+        status("🎙️ 녹음이 끝났습니다 (" + fmt(ed.duration()) + "). 아래 새 클립으로 추가됐어요.");
+      }
+    } catch (err) {
+      alert("녹음을 처리하지 못했습니다.\n(" + err + ")");
+    }
+  };
+  rec.start();
+  recState = { rec, chunks, stream, startAt: Date.now(), timer: setInterval(updateRecUI, 200) };
+  updateRecUI();
+  status("🎙️ 녹음 중입니다. 같은 버튼을 다시 누르면 중지돼요.");
+}
+$("btn-record").addEventListener("click", toggleRecord);
+$("btn-record-dz").addEventListener("click", (e) => { e.stopPropagation(); toggleRecord(); });
 
 // ---------- 키보드 (마지막에 클릭한 파형에 적용) ----------
 window.addEventListener("keydown", (e) => {
