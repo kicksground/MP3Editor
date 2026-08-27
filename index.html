@@ -204,6 +204,7 @@
         <button id="btn-clip-close">✕ 클립 닫기</button>
       </div>
       <div class="wavewrap"><canvas id="clipwave" class="wave"></canvas></div>
+      <canvas id="clipminimap" class="minimap" title="클립 전체 파형 — 드래그하면 보는 위치가 이동합니다"></canvas>
       <div class="timebar">
         <span id="clippostext">0:00.0 / 0:00.0</span>
         <span id="clipseltext"></span>
@@ -667,7 +668,7 @@ const main = new WaveEditor({
   metaEl: $("fmeta"), playBtn: $("btn-play"),
 });
 const clip = new WaveEditor({
-  canvas: $("clipwave"),
+  canvas: $("clipwave"), minimap: $("clipminimap"),
   postext: $("clippostext"), seltext: $("clipseltext"),
   metaEl: $("clipmeta"), playBtn: $("btn-clip-play"),
   selHint: "클립 안에서도 드래그로 구간을 선택할 수 있어요",
