@@ -163,6 +163,7 @@
     <span style="font-size:13px">MP3 · WAV · M4A · AAC · OGG · 동영상(MP4)의 소리 지원</span>
     <div style="margin-top:20px"><button id="btn-record-dz">🎙️ 마이크로 바로 녹음하기</button></div>
     <div style="margin-top:10px"><select id="micselect-dz" title="녹음에 사용할 마이크" style="max-width:260px"></select></div>
+    <div style="margin-top:8px"><label class="joinpick" style="justify-content:center" title="녹음이 끝나면 소리가 잘리지 않는 한도까지 자동으로 음량을 키웁니다"><input type="checkbox" id="autonorm-dz" checked> 녹음 후 음량 자동 보정</label></div>
     <input type="file" id="fileinput" accept="audio/*,video/*" hidden>
   </div>
 
@@ -190,6 +191,7 @@
       <span class="divider"></span>
       <button id="btn-record">🎙️ 녹음</button>
       <select id="micselect" title="녹음에 사용할 마이크" style="max-width:190px"></select>
+      <label class="joinpick" title="녹음이 끝나면 소리가 잘리지 않는 한도까지 자동으로 음량을 키웁니다 (작게 녹음되는 마이크에 유용)"><input type="checkbox" id="autonorm" checked> 음량 자동 보정</label>
       <span style="flex:1"></span>
       <span class="label" style="min-width:auto">보기</span>
       <button id="btn-zoomin">🔍＋</button>
@@ -1075,6 +1077,11 @@ function onMicChange(e) {
 $("micselect").addEventListener("change", onMicChange);
 $("micselect-dz").addEventListener("change", onMicChange);
 $("micselect-dz").addEventListener("click", (e) => e.stopPropagation()); // 드롭존 클릭(파일 열기)과 겹치지 않게
+
+// '음량 자동 보정' 체크박스 두 곳 동기화
+$("autonorm").addEventListener("change", () => { $("autonorm-dz").checked = $("autonorm").checked; });
+$("autonorm-dz").addEventListener("change", () => { $("autonorm").checked = $("autonorm-dz").checked; });
+$("autonorm-dz").parentElement.addEventListener("click", (e) => e.stopPropagation());
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
   navigator.mediaDevices.addEventListener("devicechange", refreshMicList);
 }
@@ -1189,6 +1196,20 @@ async function toggleRecord() {
       const chs = [];
       const nch = Math.min(2, decoded.numberOfChannels);
       for (let c = 0; c < nch; c++) chs.push(new Float32Array(decoded.getChannelData(c)));
+      // 음량 자동 보정: 작게 녹음된 소리를 잘리지 않는 한도까지 키운다 (아이폰 마이크 등)
+      let boosted = 0;
+      if ($("autonorm").checked) {
+        let peak = 0;
+        chs.forEach(c => { for (let i = 0; i < c.length; i++) { const v = Math.abs(c[i]); if (v > peak) peak = v; } });
+        if (peak > 0.0005) {
+          const g = 0.99 / peak; // 작으면 키우고, 1.0을 넘으면 살짝 줄여 클리핑을 막는다
+          if (Math.abs(g - 1) > 0.01) {
+            chs.forEach(c => { for (let i = 0; i < c.length; i++) c[i] *= g; });
+            boosted = g;
+          }
+        }
+      }
+      const boostMsg = boosted > 1.05 ? " · 음량을 " + boosted.toFixed(1) + "배로 자동 보정했어요" : "";
       recCounter++;
       if (!main.channels.length) {
         // 아직 파일이 없으면 녹음을 원본으로 연다
@@ -1197,12 +1218,12 @@ async function toggleRecord() {
         $("editor").style.display = "block";
         main.setAudio(chs, decoded.sampleRate, "녹음" + recCounter);
         focusedEditor = main;
-        status("🎙️ 녹음이 끝났습니다 (" + fmt(main.duration()) + "). 바로 편집할 수 있어요.");
+        status("🎙️ 녹음이 끝났습니다 (" + fmt(main.duration()) + ")" + boostMsg + ". 바로 편집할 수 있어요.");
       } else {
         // 편집 중이면 녹음이 새 클립으로 추가된다
         const ed = createClip(chs, decoded.sampleRate, "마이크", "녹음", "마이크 녹음");
         ed.fileName = "녹음" + clipCounter;
-        status("🎙️ 녹음이 끝났습니다 (" + fmt(ed.duration()) + "). 아래 새 클립으로 추가됐어요.");
+        status("🎙️ 녹음이 끝났습니다 (" + fmt(ed.duration()) + ")" + boostMsg + ". 아래 새 클립으로 추가됐어요.");
       }
     } catch (err) {
       alert("녹음을 처리하지 못했습니다.\n(" + err + ")");
