@@ -33,7 +33,7 @@
   }
   header h1 { font-size: 20px; font-weight: 700; }
   header .sub { color: var(--muted); font-size: 13px; }
-  main { flex: 1; padding: 20px 24px; max-width: 1100px; width: 100%; margin: 0 auto; }
+  main { flex: 1; padding: 20px 24px; max-width: 1240px; width: 100%; margin: 0 auto; }
 
   #dropzone {
     border: 2px dashed #3a4152;
@@ -69,16 +69,18 @@
   }
 
   .toolbar {
-    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-    background: var(--panel); border-radius: 10px; padding: 10px 12px; margin-top: 10px;
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    background: var(--panel); border-radius: 10px; padding: 8px 10px; margin-top: 10px;
   }
-  .toolbar .label { font-size: 12px; color: var(--muted); margin-right: 2px; min-width: 58px; }
+  .toolbar .label { font-size: 12px; color: var(--muted); margin-right: 2px; min-width: 40px; }
+  .toolbar .divider { width: 1px; align-self: stretch; background: #333949; margin: 0 6px; }
   button {
     background: var(--panel2); color: var(--text);
     border: 1px solid #333949; border-radius: 8px;
-    padding: 8px 14px; font-size: 13px; cursor: pointer;
+    padding: 7px 11px; font-size: 12.5px; cursor: pointer;
     transition: background .12s, border-color .12s;
     font-family: inherit;
+    white-space: nowrap;
   }
   button:hover:not(:disabled) { background: #2d3342; border-color: var(--accent); }
   button:disabled { opacity: .4; cursor: default; }
@@ -147,53 +149,49 @@
       <span class="label">재생</span>
       <button id="btn-play" class="primary">▶ 재생</button>
       <button id="btn-stop">⏹ 정지</button>
-      <button id="btn-playsel">🔁 선택 구간 재생</button>
+      <button id="btn-playsel">🔁 선택 구간</button>
+      <span class="divider"></span>
+      <button id="btn-undo">↩️ 실행 취소</button>
+      <button id="btn-redo">↪️ 다시 실행</button>
       <span style="flex:1"></span>
       <span class="label" style="min-width:auto">보기</span>
-      <button id="btn-zoomin">🔍＋ 확대</button>
-      <button id="btn-zoomout">🔍－ 축소</button>
-      <button id="btn-zoomfit">전체 보기</button>
+      <button id="btn-zoomin">🔍＋</button>
+      <button id="btn-zoomout">🔍－</button>
+      <button id="btn-zoomfit">전체</button>
     </div>
 
     <div class="toolbar">
       <span class="label">편집</span>
-      <button id="btn-delete">✂️ 선택 구간 삭제</button>
-      <button id="btn-crop">📌 선택 구간만 남기기</button>
-      <button id="btn-silence">🔇 무음 처리</button>
+      <button id="btn-delete">✂️ 삭제</button>
+      <button id="btn-crop">📌 선택만 남기기</button>
+      <button id="btn-silence">🔇 무음</button>
       <button id="btn-fadein">📈 페이드 인</button>
       <button id="btn-fadeout">📉 페이드 아웃</button>
       <button id="btn-normalize">🎚 음량 최적화</button>
-      <button id="btn-voice">🎤 목소리 강조 (베타)</button>
-      <button id="btn-undo">↩️ 실행 취소</button>
-    </div>
-
-    <div class="toolbar">
-      <span class="label">클립</span>
-      <button id="btn-toclip">⬇️ 선택 구간을 새 클립으로 추가</button>
-      <span style="font-size:11.5px;color:var(--muted)">원본은 그대로 두고, 선택한 부분만 아래에서 따로 편집·저장할 수 있어요. 여러 번 눌러 클립을 계속 추가할 수 있습니다.</span>
+      <button id="btn-voice">🎤 목소리 강조</button>
+      <span class="divider"></span>
+      <button id="btn-toclip">⬇️ 선택을 새 클립으로</button>
+      <button id="btn-joinclips">🔗 클립 이어 붙이기</button>
     </div>
 
     <div class="toolbar">
       <span class="label">볼륨</span>
-      <input type="range" id="volslider" min="0" max="200" value="100" style="flex:1;min-width:120px;max-width:300px">
+      <input type="range" id="volslider" min="0" max="200" value="100" style="flex:1;min-width:100px;max-width:220px">
       <span id="volval">100%</span>
       <button id="btn-volume">파일에 적용</button>
-      <span style="font-size:11.5px;color:var(--muted)">슬라이더는 재생 소리에 바로 반영됩니다. ‘파일에 적용’을 눌러야 저장에도 반영돼요.</span>
-    </div>
-
-    <div class="toolbar">
-      <span class="label">저장</span>
+      <span class="divider"></span>
+      <span class="label" style="min-width:auto">저장</span>
       <select id="savescope">
-        <option value="all">전체 저장</option>
-        <option value="sel">선택 구간만 저장</option>
+        <option value="all">전체</option>
+        <option value="sel">선택 구간만</option>
       </select>
       <select id="bitrate">
-        <option value="128">MP3 음질: 128 kbps (보통)</option>
-        <option value="192" selected>MP3 음질: 192 kbps (좋음)</option>
-        <option value="320">MP3 음질: 320 kbps (최고)</option>
+        <option value="128">128 kbps (보통)</option>
+        <option value="192" selected>192 kbps (좋음)</option>
+        <option value="320">320 kbps (최고)</option>
       </select>
-      <button id="btn-mp3" class="green save-btn">⬇ MP3로 저장</button>
-      <button id="btn-wav" class="save-btn">⬇ WAV로 저장</button>
+      <button id="btn-mp3" class="green save-btn">⬇ MP3</button>
+      <button id="btn-wav" class="save-btn">⬇ WAV</button>
     </div>
 
     <!-- 클립 편집기들이 이 안에 계속 추가된다 -->
@@ -208,8 +206,11 @@
     <div id="hint">
       💡 <b>사용 팁</b> &nbsp;·&nbsp; 파형을 <b>클릭</b>=재생 위치 이동, <b>드래그</b>=구간 선택.
       &nbsp;·&nbsp; <kbd>마우스 휠</kbd> 확대/축소, <kbd>Shift+휠</kbd> 좌우 이동, 파형 아래 <b>미니맵을 드래그</b>해도 이동합니다.
-      &nbsp;·&nbsp; <kbd>스페이스</kbd> 재생/정지 &nbsp;·&nbsp; <kbd>⌫</kbd> 선택 삭제 &nbsp;·&nbsp; <kbd>⌘Z</kbd> 실행 취소 (마지막에 클릭한 파형에 적용)
+      &nbsp;·&nbsp; <kbd>스페이스</kbd> 재생/정지 &nbsp;·&nbsp; <kbd>⌫</kbd> 선택 삭제 &nbsp;·&nbsp; <kbd>⌘Z</kbd> 실행 취소, <kbd>⌘⇧Z</kbd> 다시 실행 (마지막에 클릭한 파형에 적용)
       &nbsp;·&nbsp; 구간을 선택하지 않으면 볼륨·페이드·무음은 전체에 적용됩니다.
+      &nbsp;·&nbsp; 볼륨 슬라이더는 재생 소리에 바로 반영되고, ‘파일에 적용’을 눌러야 저장에도 반영됩니다.
+      &nbsp;·&nbsp; <b>⬇️ 선택을 새 클립으로</b>: 원본은 그대로 두고 선택 부분을 아래 클립으로 복사해 따로 편집·저장합니다. 여러 번 눌러 계속 추가할 수 있어요.
+      &nbsp;·&nbsp; <b>🔗 클립 이어 붙이기</b>: 열려 있는 클립들을 위에서부터 순서대로 연결한 새 클립을 만듭니다.
       &nbsp;·&nbsp; 파형의 <b style="color:var(--danger)">빨간 부분</b>은 소리가 최대 한계에 닿아 잘린(클리핑) 곳입니다.
       &nbsp;·&nbsp; 저장 시 Chrome에서는 폴더를 직접 고를 수 있고, 위치 선택을 지원하지 않는 브라우저(Safari 등)는 다운로드 폴더에 저장됩니다.
     </div>
@@ -271,6 +272,7 @@ class WaveEditor {
     this.playState = null;
     this.gainNode = null;
     this.undoStack = [];
+    this.redoStack = [];
 
     this._bindMouse();
     this._bindWheel();
@@ -296,6 +298,7 @@ class WaveEditor {
     this.cursor = 0;
     this.viewStart = 0; this.viewEnd = this.duration();
     this.undoStack = [];
+    this.redoStack = [];
     this.resize();
     this.updateAll();
   }
@@ -544,9 +547,17 @@ class WaveEditor {
   }
 
   // ---------- 편집 ----------
+  _snap() {
+    return { channels: this.channels.map(c => new Float32Array(c)), selStart: this.selStart, selEnd: this.selEnd, cursor: this.cursor };
+  }
+  _restore(s) {
+    this.channels = s.channels; this.selStart = s.selStart; this.selEnd = s.selEnd; this.cursor = s.cursor;
+    this.afterEdit();
+  }
   pushUndo() {
-    this.undoStack.push({ channels: this.channels.map(c => new Float32Array(c)), selStart: this.selStart, selEnd: this.selEnd, cursor: this.cursor });
+    this.undoStack.push(this._snap());
     if (this.undoStack.length > 10) this.undoStack.shift();
+    this.redoStack = []; // 새 편집을 하면 '다시 실행' 이력은 사라진다
   }
   afterEdit() {
     this.stop(false);
@@ -556,8 +567,16 @@ class WaveEditor {
   undo() {
     const s = this.undoStack.pop();
     if (!s) return;
-    this.channels = s.channels; this.selStart = s.selStart; this.selEnd = s.selEnd; this.cursor = s.cursor;
-    this.afterEdit();
+    this.redoStack.push(this._snap());
+    if (this.redoStack.length > 10) this.redoStack.shift();
+    this._restore(s);
+  }
+  redo() {
+    const s = this.redoStack.pop();
+    if (!s) return;
+    this.undoStack.push(this._snap());
+    if (this.undoStack.length > 10) this.undoStack.shift();
+    this._restore(s);
   }
   requireSelection() {
     if (!this.hasSelection()) { alert("먼저 파형에서 구간을 드래그해서 선택해 주세요."); return false; }
@@ -697,6 +716,7 @@ $("btn-fadein").addEventListener("click", () => main.fade(true));
 $("btn-fadeout").addEventListener("click", () => main.fade(false));
 $("btn-normalize").addEventListener("click", () => main.normalize());
 $("btn-undo").addEventListener("click", () => main.undo());
+$("btn-redo").addEventListener("click", () => main.redo());
 
 // ---------- 클립 편집기 (필요한 만큼 아래로 계속 추가) ----------
 let clipCounter = 0;
@@ -716,14 +736,15 @@ function closeAllClips() {
   while (clipEntries.length) closeClip(clipEntries[0]);
   clipCounter = 0;
 }
-function createClip(chs, sr, base) {
+function createClip(chs, sr, base, kind) {
   clipCounter++;
-  const name = base + "_클립" + clipCounter;
+  const label = (kind || "클립") + " " + clipCounter;
+  const name = base + "_" + (kind || "클립") + clipCounter;
   const sec = document.createElement("div");
   sec.className = "clipsec";
   sec.innerHTML = `
     <div class="fileinfo">
-      <span>✂️ <b>클립 ${clipCounter}</b> &nbsp; <span class="clipmeta"></span></span>
+      <span>✂️ <b>${label}</b> &nbsp; <span class="clipmeta"></span></span>
       <button class="c-close">✕ 클립 닫기</button>
     </div>
     <div class="wavewrap"><canvas class="wave"></canvas></div>
@@ -735,16 +756,19 @@ function createClip(chs, sr, base) {
     <div class="toolbar">
       <button class="c-play primary">▶ 재생</button>
       <button class="c-stop">⏹ 정지</button>
-      <button class="c-del">✂️ 선택 삭제</button>
+      <span class="divider"></span>
+      <button class="c-undo" title="실행 취소 (⌘Z)">↩️</button>
+      <button class="c-redo" title="다시 실행 (⌘⇧Z)">↪️</button>
+      <span class="divider"></span>
+      <button class="c-del">✂️ 삭제</button>
       <button class="c-crop">📌 선택만 남기기</button>
       <button class="c-fin">📈 페이드 인</button>
       <button class="c-fout">📉 페이드 아웃</button>
       <button class="c-norm">🎚 음량 최적화</button>
-      <button class="c-undo">↩️ 실행 취소</button>
       <button class="c-toclip">⬇️ 선택을 새 클립으로</button>
       <span style="flex:1"></span>
-      <button class="c-mp3 green save-btn">⬇ MP3 저장</button>
-      <button class="c-wav save-btn">⬇ WAV 저장</button>
+      <button class="c-mp3 green save-btn">⬇ MP3</button>
+      <button class="c-wav save-btn">⬇ WAV</button>
     </div>`;
   $("clips").appendChild(sec);
   const q = (sel) => sec.querySelector(sel);
@@ -767,9 +791,10 @@ function createClip(chs, sr, base) {
   q(".c-fout").addEventListener("click", () => ed.fade(false));
   q(".c-norm").addEventListener("click", () => ed.normalize());
   q(".c-undo").addEventListener("click", () => ed.undo());
+  q(".c-redo").addEventListener("click", () => ed.redo());
   q(".c-toclip").addEventListener("click", () => { // 클립에서 다시 새 클립을 만들 수도 있다
     if (!ed.requireSelection()) return;
-    createClip(ed.copyRange(), ed.sampleRate, ed.fileName.replace(/_클립\d+$/, ""));
+    createClip(ed.copyRange(), ed.sampleRate, ed.fileName.replace(/_(클립|합본)\d+$/, ""));
     status("✂️ 선택 구간을 새 클립으로 복사했습니다.");
   });
   q(".c-mp3").addEventListener("click", () => saveAudio(ed.channels, ed.sampleRate, ed.fileName, "mp3"));
@@ -781,6 +806,36 @@ $("btn-toclip").addEventListener("click", () => {
   if (!main.requireSelection()) return;
   createClip(main.copyRange(), main.sampleRate, main.fileName.replace(/\.[^.]+$/, ""));
   status("✂️ 선택 구간을 새 클립으로 복사했습니다. 원본은 그대로예요.");
+});
+
+// ---------- 클립 이어 붙이기: 열려 있는 클립을 위에서부터 순서대로 연결한 새 클립 생성 ----------
+$("btn-joinclips").addEventListener("click", () => {
+  const list = clipEntries.map(e => e.editor).filter(ed => ed.channels.length);
+  if (list.length < 2) {
+    alert("이어 붙이려면 클립이 2개 이상 필요합니다.\n먼저 ‘⬇️ 선택을 새 클립으로’로 클립을 만들어 주세요.");
+    return;
+  }
+  const sr = list[0].sampleRate;
+  if (list.some(ed => ed.sampleRate !== sr)) {
+    alert("샘플링 주파수가 다른 클립이 섞여 있어 이어 붙일 수 없습니다.");
+    return;
+  }
+  const nch = Math.max(...list.map(ed => ed.channels.length));
+  const total = list.reduce((s, ed) => s + ed.channels[0].length, 0);
+  const chs = [];
+  for (let c = 0; c < nch; c++) {
+    const out = new Float32Array(total);
+    let off = 0;
+    for (const ed of list) {
+      // 모노 클립이 섞여 있으면 그 채널을 양쪽에 복사
+      const src = ed.channels[Math.min(c, ed.channels.length - 1)];
+      out.set(src, off);
+      off += src.length;
+    }
+    chs.push(out);
+  }
+  createClip(chs, sr, main.fileName.replace(/\.[^.]+$/, ""), "합본");
+  status("🔗 클립 " + list.length + "개를 순서대로 이어 붙여 새 클립(합본)을 만들었습니다. 아래에서 확인하세요.");
 });
 
 // ---------- 볼륨 (원본 편집기 전용) ----------
@@ -845,7 +900,7 @@ window.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
   if (e.code === "Space") { e.preventDefault(); ed.toggle(); }
   else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); ed.del(); }
-  else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); ed.undo(); }
+  else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) ed.redo(); else ed.undo(); }
 });
 
 // ---------- 저장 ----------
