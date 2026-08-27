@@ -14,8 +14,6 @@
     --accent: #4f8cff;
     --accent2: #37c993;
     --danger: #ff6b6b;
-    --wave: #5aa2ff;
-    --sel: rgba(79, 140, 255, 0.25);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -52,19 +50,22 @@
   #dropzone .big { font-size: 40px; display: block; margin-bottom: 8px; }
 
   #editor { display: none; }
-  #fileinfo {
+  .fileinfo {
     display: flex; justify-content: space-between; align-items: center;
     margin-bottom: 10px; font-size: 13px; color: var(--muted);
     flex-wrap: wrap; gap: 8px;
   }
-  #fileinfo b { color: var(--text); font-size: 14px; }
+  .fileinfo b { color: var(--text); font-size: 14px; }
 
-  #wavewrap { position: relative; background: var(--panel); border-radius: 10px; overflow: hidden; }
-  canvas#wave { display: block; width: 100%; height: 220px; cursor: text; }
+  .wavewrap { position: relative; background: var(--panel); border-radius: 10px 10px 0 0; overflow: hidden; }
+  canvas.wave { display: block; width: 100%; height: 220px; cursor: text; }
+  canvas.minimap { display: block; width: 100%; height: 44px; background: #171a21; border-radius: 0 0 10px 10px; cursor: grab; margin-top: 1px; }
+  #clipsec canvas.wave { height: 150px; }
 
-  #timebar {
+  .timebar {
     display: flex; justify-content: space-between; padding: 6px 2px;
     font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;
+    flex-wrap: wrap; gap: 4px;
   }
 
   .toolbar {
@@ -93,6 +94,13 @@
   }
   #volval { font-size: 12px; color: var(--muted); min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
 
+  #clipsec {
+    display: none;
+    margin-top: 26px; padding-top: 16px;
+    border-top: 2px solid #2a2e3a;
+  }
+  #clipsec .fileinfo b { color: var(--accent2); }
+
   #progresswrap { margin-top: 12px; display: none; }
   #progressouter { background: var(--panel2); border-radius: 6px; height: 10px; overflow: hidden; }
   #progressbar { background: var(--accent2); height: 100%; width: 0%; transition: width .1s; }
@@ -119,20 +127,19 @@
   <div id="dropzone">
     <span class="big">🎧</span>
     오디오 파일을 여기로 <b>드래그</b>하거나 <b>클릭</b>해서 선택하세요<br>
-    <span style="font-size:13px">MP3 · WAV · M4A · AAC · OGG 지원</span>
-    <input type="file" id="fileinput" accept="audio/*" hidden>
+    <span style="font-size:13px">MP3 · WAV · M4A · AAC · OGG · 동영상(MP4)의 소리 지원</span>
+    <input type="file" id="fileinput" accept="audio/*,video/*" hidden>
   </div>
 
   <div id="editor">
-    <div id="fileinfo">
+    <div class="fileinfo">
       <span><b id="fname"></b> &nbsp; <span id="fmeta"></span></span>
       <button id="btn-newfile">다른 파일 열기</button>
     </div>
 
-    <div id="wavewrap">
-      <canvas id="wave"></canvas>
-    </div>
-    <div id="timebar">
+    <div class="wavewrap"><canvas id="wave" class="wave"></canvas></div>
+    <canvas id="minimap" class="minimap" title="전체 파형 — 드래그하면 보는 위치가 이동합니다"></canvas>
+    <div class="timebar">
       <span id="postext">0:00.0 / 0:00.0</span>
       <span id="seltext">파형을 드래그하면 구간이 선택됩니다</span>
     </div>
@@ -162,6 +169,12 @@
     </div>
 
     <div class="toolbar">
+      <span class="label">클립</span>
+      <button id="btn-toclip">⬇️ 선택 구간을 아래 클립 편집기로 보내기</button>
+      <span style="font-size:11.5px;color:var(--muted)">원본은 그대로 두고, 선택한 부분만 아래에서 따로 편집·저장할 수 있어요.</span>
+    </div>
+
+    <div class="toolbar">
       <span class="label">볼륨</span>
       <input type="range" id="volslider" min="0" max="200" value="100" style="flex:1;min-width:120px;max-width:300px">
       <span id="volval">100%</span>
@@ -184,6 +197,32 @@
       <button id="btn-wav">⬇ WAV로 저장</button>
     </div>
 
+    <!-- 클립 편집기: 선택 구간을 별도로 편집하는 두 번째 파형 -->
+    <div id="clipsec">
+      <div class="fileinfo">
+        <span>✂️ <b>클립 편집기</b> &nbsp; <span id="clipmeta"></span></span>
+        <button id="btn-clip-close">✕ 클립 닫기</button>
+      </div>
+      <div class="wavewrap"><canvas id="clipwave" class="wave"></canvas></div>
+      <div class="timebar">
+        <span id="clippostext">0:00.0 / 0:00.0</span>
+        <span id="clipseltext"></span>
+      </div>
+      <div class="toolbar">
+        <button id="btn-clip-play" class="primary">▶ 재생</button>
+        <button id="btn-clip-stop">⏹ 정지</button>
+        <button id="btn-clip-delete">✂️ 선택 삭제</button>
+        <button id="btn-clip-crop">📌 선택만 남기기</button>
+        <button id="btn-clip-fadein">📈 페이드 인</button>
+        <button id="btn-clip-fadeout">📉 페이드 아웃</button>
+        <button id="btn-clip-normalize">🎚 음량 최적화</button>
+        <button id="btn-clip-undo">↩️ 실행 취소</button>
+        <span style="flex:1"></span>
+        <button id="btn-clip-mp3" class="green">⬇ 클립 MP3 저장</button>
+        <button id="btn-clip-wav">⬇ 클립 WAV 저장</button>
+      </div>
+    </div>
+
     <div id="progresswrap">
       <div id="progressouter"><div id="progressbar"></div></div>
       <div id="progresstext"></div>
@@ -191,11 +230,12 @@
     <div id="status"></div>
 
     <div id="hint">
-      💡 <b>사용 팁</b> &nbsp;·&nbsp; 파형을 <b>클릭</b>하면 재생 위치가 이동하고, <b>드래그</b>하면 구간이 선택됩니다.
-      &nbsp;·&nbsp; 파형 위에서 <kbd>마우스 휠 / 트랙패드 스크롤</kbd>로 확대·축소, 좌우 스크롤로 이동합니다.
-      &nbsp;·&nbsp; <kbd>스페이스</kbd> 재생/정지 &nbsp;·&nbsp; <kbd>⌫ 삭제</kbd> 선택 구간 삭제 &nbsp;·&nbsp; <kbd>⌘Z</kbd> 실행 취소
+      💡 <b>사용 팁</b> &nbsp;·&nbsp; 파형을 <b>클릭</b>=재생 위치 이동, <b>드래그</b>=구간 선택.
+      &nbsp;·&nbsp; <kbd>마우스 휠</kbd> 확대/축소, <kbd>Shift+휠</kbd> 좌우 이동, 파형 아래 <b>미니맵을 드래그</b>해도 이동합니다.
+      &nbsp;·&nbsp; <kbd>스페이스</kbd> 재생/정지 &nbsp;·&nbsp; <kbd>⌫</kbd> 선택 삭제 &nbsp;·&nbsp; <kbd>⌘Z</kbd> 실행 취소 (마지막에 클릭한 파형에 적용)
       &nbsp;·&nbsp; 구간을 선택하지 않으면 볼륨·페이드·무음은 전체에 적용됩니다.
       &nbsp;·&nbsp; 파형의 <b style="color:var(--danger)">빨간 부분</b>은 소리가 최대 한계에 닿아 잘린(클리핑) 곳입니다.
+      &nbsp;·&nbsp; 저장 시 Chrome에서는 폴더를 직접 고를 수 있고, 위치 선택을 지원하지 않는 브라우저(Safari 등)는 다운로드 폴더에 저장됩니다.
     </div>
   </div>
 </main>
@@ -206,59 +246,441 @@
 <script>
 "use strict";
 
-// ---------- 상태 ----------
-let actx = null;            // AudioContext (재생용)
-let channels = [];          // 채널별 Float32Array (편집 대상 원본 데이터)
-let sampleRate = 44100;
-let fileName = "";
-let selStart = null, selEnd = null; // 선택 구간 (초)
-let cursor = 0;             // 재생 시작 위치 (초)
-let playState = null;       // { source, ctxStart, offset, endAt }
-let undoStack = [];
-let viewStart = 0, viewEnd = 0; // 현재 화면에 보이는 구간 (초) — 확대/축소용
-let gainNode = null;        // 실시간 볼륨 미리듣기용
-let statusTimer = null;
-const UNDO_LIMIT = 10;
-
 const $ = (id) => document.getElementById(id);
-const dropzone = $("dropzone"), editor = $("editor");
-const canvas = $("wave"), wavewrap = $("wavewrap");
-const ctx2d = canvas.getContext("2d");
-
-// ---------- 유틸 ----------
-function duration() { return channels.length ? channels[0].length / sampleRate : 0; }
 function fmt(t) {
   if (!isFinite(t) || t < 0) t = 0;
   const m = Math.floor(t / 60), s = t - m * 60;
   return m + ":" + (s < 10 ? "0" : "") + s.toFixed(1);
 }
 function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
-function hasSelection() { return selStart !== null && selEnd !== null && Math.abs(selEnd - selStart) > 0.005; }
-function selRange() { // 샘플 단위 [start, end)
-  const a = Math.min(selStart, selEnd), b = Math.max(selStart, selEnd);
-  return [Math.floor(a * sampleRate), Math.min(channels[0].length, Math.ceil(b * sampleRate))];
-}
-// 선택이 없으면 전체를 대상으로
-function targetRange() {
-  return hasSelection() ? selRange() : [0, channels[0].length];
-}
-// 화면 보기 구간이 항상 오디오 범위 안에 있도록 보정
-function clampView() {
-  const d = duration();
-  let span = viewEnd - viewStart;
-  if (!(span > 0) || span > d) { viewStart = 0; viewEnd = d; return; }
-  if (viewStart < 0) { viewEnd -= viewStart; viewStart = 0; }
-  if (viewEnd > d) { viewStart -= viewEnd - d; viewEnd = d; if (viewStart < 0) viewStart = 0; }
-}
-function timeToX(t, W) { return (t - viewStart) / (viewEnd - viewStart) * W; }
+
+let actx = null;
+let statusTimer = null;
 function status(msg) {
   const el = $("status");
   el.textContent = msg;
   clearTimeout(statusTimer);
   statusTimer = setTimeout(() => { el.textContent = ""; }, 9000);
 }
+function ensureCtx() {
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  if (actx.state === "suspended") actx.resume();
+}
+
+const editors = [];      // 열려 있는 모든 파형 편집기 (원본 + 클립)
+let focusedEditor = null; // 키보드 단축키가 적용될, 마지막에 클릭한 편집기
+
+// ============================================================
+// WaveEditor: 파형 하나(캔버스 + 선택 + 재생 + 편집)를 담당하는 부품.
+// 원본 편집기와 클립 편집기 두 곳에서 재사용한다.
+// ============================================================
+class WaveEditor {
+  constructor(cfg) {
+    this.canvas = cfg.canvas;
+    this.ctx = this.canvas.getContext("2d");
+    this.minimap = cfg.minimap || null;
+    this.mctx = this.minimap ? this.minimap.getContext("2d") : null;
+    this.postext = cfg.postext;
+    this.seltext = cfg.seltext;
+    this.metaEl = cfg.metaEl;
+    this.playBtn = cfg.playBtn;
+    this.selHint = cfg.selHint || "파형을 드래그하면 구간이 선택됩니다";
+
+    this.channels = [];
+    this.sampleRate = 44100;
+    this.fileName = "audio";
+    this.selStart = null; this.selEnd = null;
+    this.cursor = 0;
+    this.viewStart = 0; this.viewEnd = 0;
+    this.playState = null;
+    this.gainNode = null;
+    this.undoStack = [];
+
+    this._bindMouse();
+    this._bindWheel();
+    if (this.minimap) this._bindMinimap();
+    editors.push(this);
+  }
+
+  // ---------- 기본 정보 ----------
+  duration() { return this.channels.length ? this.channels[0].length / this.sampleRate : 0; }
+  hasSelection() { return this.selStart !== null && this.selEnd !== null && Math.abs(this.selEnd - this.selStart) > 0.005; }
+  selRange() {
+    const a = Math.min(this.selStart, this.selEnd), b = Math.max(this.selStart, this.selEnd);
+    return [Math.floor(a * this.sampleRate), Math.min(this.channels[0].length, Math.ceil(b * this.sampleRate))];
+  }
+  targetRange() { return this.hasSelection() ? this.selRange() : [0, this.channels[0].length]; }
+
+  setAudio(chs, sr, name) {
+    this.stop(false);
+    this.channels = chs;
+    this.sampleRate = sr;
+    this.fileName = name;
+    this.selStart = this.selEnd = null;
+    this.cursor = 0;
+    this.viewStart = 0; this.viewEnd = this.duration();
+    this.undoStack = [];
+    this.resize();
+    this.updateAll();
+  }
+
+  // ---------- 보기(확대/축소) ----------
+  clampView() {
+    const d = this.duration();
+    let span = this.viewEnd - this.viewStart;
+    if (!(span > 0) || span > d) { this.viewStart = 0; this.viewEnd = d; return; }
+    if (this.viewStart < 0) { this.viewEnd -= this.viewStart; this.viewStart = 0; }
+    if (this.viewEnd > d) { this.viewStart -= this.viewEnd - d; this.viewEnd = d; if (this.viewStart < 0) this.viewStart = 0; }
+  }
+  timeToX(t, W) { return (t - this.viewStart) / (this.viewEnd - this.viewStart) * W; }
+  xToTime(clientX) {
+    const r = this.canvas.getBoundingClientRect();
+    return this.viewStart + clamp((clientX - r.left) / r.width, 0, 1) * (this.viewEnd - this.viewStart);
+  }
+  zoomAt(t, factor) {
+    const d = this.duration();
+    const minSpan = Math.max(0.02, 256 / this.sampleRate);
+    const span = clamp((this.viewEnd - this.viewStart) * factor, minSpan, d);
+    const frac = clamp((t - this.viewStart) / (this.viewEnd - this.viewStart), 0, 1);
+    this.viewStart = t - frac * span;
+    this.viewEnd = this.viewStart + span;
+    this.clampView(); this.draw(); this.updateTimebar();
+  }
+  pan(dSec) {
+    this.viewStart += dSec; this.viewEnd += dSec;
+    this.clampView(); this.draw(); this.updateTimebar();
+  }
+  zoomFit() { this.viewStart = 0; this.viewEnd = this.duration(); this.draw(); this.updateTimebar(); }
+
+  // ---------- 그리기 ----------
+  resize() {
+    const dpr = window.devicePixelRatio || 1;
+    const wrap = this.canvas.parentElement;
+    this.canvas.width = Math.floor(wrap.clientWidth * dpr);
+    this.canvas.height = Math.floor(this.canvas.clientHeight * dpr);
+    if (this.minimap) {
+      this.minimap.width = Math.floor(this.minimap.clientWidth * dpr);
+      this.minimap.height = Math.floor(this.minimap.clientHeight * dpr);
+    }
+    this.draw();
+  }
+  draw() {
+    if (!this.channels.length) return;
+    this.clampView();
+    const ctx = this.ctx, W = this.canvas.width, H = this.canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    const data = this.channels[0];
+    const s0v = Math.floor(this.viewStart * this.sampleRate);
+    const s1v = Math.min(data.length, Math.ceil(this.viewEnd * this.sampleRate));
+    const step = (s1v - s0v) / W;
+    const mid = H / 2, amp = H / 2 - 4;
+
+    for (let x = 0; x < W; x++) {
+      let lo = 1, hi = -1;
+      const a = s0v + Math.floor(x * step), b = Math.min(s1v, s0v + Math.floor((x + 1) * step) + 1);
+      const stride = Math.max(1, Math.floor((b - a) / 50));
+      for (let i = a; i < b; i += stride) {
+        const v = data[i];
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      if (hi < lo) continue;
+      ctx.fillStyle = (hi >= 0.999 || lo <= -0.999) ? "#ff6b6b" : "#5aa2ff";
+      const y1 = mid - hi * amp, y2 = mid - lo * amp;
+      ctx.fillRect(x, y1, 1, Math.max(1, y2 - y1));
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.15)";
+    ctx.fillRect(0, mid, W, 1);
+
+    if (this.hasSelection()) {
+      const a = this.timeToX(Math.min(this.selStart, this.selEnd), W);
+      const b = this.timeToX(Math.max(this.selStart, this.selEnd), W);
+      if (b > 0 && a < W) {
+        ctx.fillStyle = "rgba(79,140,255,0.28)";
+        ctx.fillRect(Math.max(0, a), 0, Math.min(W, b) - Math.max(0, a), H);
+        ctx.fillStyle = "#4f8cff";
+        ctx.fillRect(a, 0, 2, H);
+        ctx.fillRect(b - 2, 0, 2, H);
+      }
+    }
+
+    const t = this.playState ? this.currentPlayTime() : this.cursor;
+    const cx = this.timeToX(clamp(t, 0, this.duration()), W);
+    if (cx >= -2 && cx <= W + 2) {
+      ctx.fillStyle = "#37c993";
+      ctx.fillRect(cx - 1, 0, 2.5, H);
+    }
+    this.drawMinimap();
+  }
+  drawMinimap() {
+    if (!this.mctx || !this.channels.length) return;
+    const ctx = this.mctx, W = this.minimap.width, H = this.minimap.height;
+    ctx.clearRect(0, 0, W, H);
+    const data = this.channels[0], N = data.length;
+    const step = N / W, mid = H / 2, amp = H / 2 - 2;
+    ctx.fillStyle = "#3d5a85";
+    for (let x = 0; x < W; x++) {
+      let lo = 1, hi = -1;
+      const a = Math.floor(x * step), b = Math.min(N, Math.floor((x + 1) * step) + 1);
+      const stride = Math.max(1, Math.floor((b - a) / 20));
+      for (let i = a; i < b; i += stride) {
+        const v = data[i];
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      if (hi < lo) continue;
+      ctx.fillRect(x, mid - hi * amp, 1, Math.max(1, (hi - lo) * amp));
+    }
+    // 현재 보고 있는 구간 표시
+    const d = this.duration();
+    const a = this.viewStart / d * W, b = this.viewEnd / d * W;
+    ctx.fillStyle = "rgba(79,140,255,0.2)";
+    ctx.fillRect(a, 0, b - a, H);
+    ctx.strokeStyle = "#4f8cff";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(a + 1, 1, Math.max(4, b - a - 2), H - 2);
+  }
+  updateTimebar() {
+    const t = this.playState ? this.currentPlayTime() : this.cursor;
+    let pos = fmt(t) + " / " + fmt(this.duration());
+    if (this.viewEnd - this.viewStart < this.duration() - 0.01) pos += "  ·  🔍 " + fmt(this.viewStart) + " ~ " + fmt(this.viewEnd);
+    this.postext.textContent = pos;
+    this.seltext.textContent = this.hasSelection()
+      ? "선택: " + fmt(Math.min(this.selStart, this.selEnd)) + " ~ " + fmt(Math.max(this.selStart, this.selEnd)) + " (" + fmt(Math.abs(this.selEnd - this.selStart)) + ")"
+      : this.selHint;
+  }
+  updateMeta() {
+    if (!this.metaEl) return;
+    this.metaEl.textContent = fmt(this.duration()) + " · " + (this.channels.length === 2 ? "스테레오" : "모노") + " · " + (this.sampleRate / 1000) + "kHz";
+  }
+  updateAll() { this.updateMeta(); this.draw(); this.updateTimebar(); }
+
+  // ---------- 마우스 ----------
+  _bindMouse() {
+    let dragging = false, dragStartX = 0;
+    this.canvas.addEventListener("mousedown", (e) => {
+      if (!this.channels.length) return;
+      focusedEditor = this;
+      dragging = true; dragStartX = e.clientX;
+      this.selStart = this.xToTime(e.clientX); this.selEnd = this.selStart;
+      this.draw();
+    });
+    window.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      this.selEnd = this.xToTime(e.clientX);
+      this.draw(); this.updateTimebar();
+    });
+    window.addEventListener("mouseup", (e) => {
+      if (!dragging) return;
+      dragging = false;
+      if (Math.abs(e.clientX - dragStartX) < 4) { // 클릭: 커서 이동
+        this.cursor = this.xToTime(e.clientX);
+        this.selStart = this.selEnd = null;
+      }
+      this.draw(); this.updateTimebar();
+    });
+  }
+  _bindWheel() {
+    this.canvas.addEventListener("wheel", (e) => {
+      if (!this.channels.length) return;
+      e.preventDefault();
+      const span = this.viewEnd - this.viewStart;
+      if (e.shiftKey && e.deltaY) {
+        // Shift+휠: 좌우 이동
+        this.pan(e.deltaY / this.canvas.getBoundingClientRect().width * span * 2);
+      } else if (e.deltaY) {
+        this.zoomAt(this.xToTime(e.clientX), Math.exp(e.deltaY * 0.0018));
+      }
+      if (e.deltaX) {
+        this.pan(e.deltaX / this.canvas.getBoundingClientRect().width * span);
+      }
+    }, { passive: false });
+  }
+  _bindMinimap() {
+    let scrubbing = false;
+    const jump = (clientX) => {
+      const r = this.minimap.getBoundingClientRect();
+      const t = clamp((clientX - r.left) / r.width, 0, 1) * this.duration();
+      const span = this.viewEnd - this.viewStart;
+      this.viewStart = t - span / 2;
+      this.viewEnd = this.viewStart + span;
+      this.clampView(); this.draw(); this.updateTimebar();
+    };
+    this.minimap.addEventListener("mousedown", (e) => {
+      if (!this.channels.length) return;
+      scrubbing = true;
+      this.minimap.style.cursor = "grabbing";
+      jump(e.clientX);
+    });
+    window.addEventListener("mousemove", (e) => { if (scrubbing) jump(e.clientX); });
+    window.addEventListener("mouseup", () => { if (scrubbing) { scrubbing = false; this.minimap.style.cursor = "grab"; } });
+  }
+
+  // ---------- 재생 ----------
+  currentPlayTime() {
+    if (!this.playState) return this.cursor;
+    return this.playState.offset + (actx.currentTime - this.playState.ctxStart);
+  }
+  play(from, to) {
+    ensureCtx();
+    editors.forEach(ed => ed.stop(true)); // 다른 파형이 재생 중이면 멈춤
+    if (!this.gainNode) {
+      this.gainNode = actx.createGain();
+      this.gainNode.connect(actx.destination);
+    }
+    const source = actx.createBufferSource();
+    const buf = actx.createBuffer(this.channels.length, this.channels[0].length, this.sampleRate);
+    for (let c = 0; c < this.channels.length; c++) buf.copyToChannel(this.channels[c], c);
+    source.buffer = buf;
+    source.connect(this.gainNode);
+    const dur = (to !== undefined ? to : this.duration()) - from;
+    if (dur <= 0) return;
+    source.start(0, from, dur);
+    this.playState = { source, ctxStart: actx.currentTime, offset: from, endAt: from + dur };
+    source.onended = () => {
+      if (this.playState && this.playState.source === source) {
+        this.cursor = this.playState.endAt >= this.duration() - 0.05 ? 0 : this.playState.endAt;
+        this.playState = null;
+        if (this.playBtn) this.playBtn.textContent = "▶ 재생";
+        this.draw(); this.updateTimebar();
+      }
+    };
+    if (this.playBtn) this.playBtn.textContent = "⏸ 일시정지";
+    const anim = () => {
+      if (!this.playState) return;
+      this.draw(); this.updateTimebar();
+      requestAnimationFrame(anim);
+    };
+    anim();
+  }
+  stop(keepPos) {
+    if (this.playState) {
+      if (keepPos) this.cursor = clamp(this.currentPlayTime(), 0, this.duration());
+      const s = this.playState.source;
+      this.playState = null;
+      try { s.onended = null; s.stop(); } catch (e) {}
+    }
+    if (this.playBtn) this.playBtn.textContent = "▶ 재생";
+  }
+  toggle() {
+    if (this.playState) { this.stop(true); this.draw(); this.updateTimebar(); }
+    else this.play(this.hasSelection() ? Math.min(this.selStart, this.selEnd) : this.cursor);
+  }
+
+  // ---------- 편집 ----------
+  pushUndo() {
+    this.undoStack.push({ channels: this.channels.map(c => new Float32Array(c)), selStart: this.selStart, selEnd: this.selEnd, cursor: this.cursor });
+    if (this.undoStack.length > 10) this.undoStack.shift();
+  }
+  afterEdit() {
+    this.stop(false);
+    this.cursor = clamp(this.cursor, 0, this.duration());
+    this.updateAll();
+  }
+  undo() {
+    const s = this.undoStack.pop();
+    if (!s) return;
+    this.channels = s.channels; this.selStart = s.selStart; this.selEnd = s.selEnd; this.cursor = s.cursor;
+    this.afterEdit();
+  }
+  requireSelection() {
+    if (!this.hasSelection()) { alert("먼저 파형에서 구간을 드래그해서 선택해 주세요."); return false; }
+    return true;
+  }
+  del() {
+    if (!this.requireSelection()) return;
+    this.pushUndo();
+    const [a, b] = this.selRange();
+    this.channels = this.channels.map(c => {
+      const out = new Float32Array(c.length - (b - a));
+      out.set(c.subarray(0, a), 0);
+      out.set(c.subarray(b), a);
+      return out;
+    });
+    this.cursor = a / this.sampleRate;
+    this.selStart = this.selEnd = null;
+    this.afterEdit();
+  }
+  crop() {
+    if (!this.requireSelection()) return;
+    this.pushUndo();
+    const [a, b] = this.selRange();
+    this.channels = this.channels.map(c => new Float32Array(c.subarray(a, b)));
+    this.cursor = 0; this.selStart = this.selEnd = null;
+    this.afterEdit();
+  }
+  silence() {
+    this.pushUndo();
+    const [a, b] = this.targetRange();
+    this.channels.forEach(c => c.fill(0, a, b));
+    this.afterEdit();
+  }
+  fade(fadeIn) {
+    this.pushUndo();
+    const [a, b] = this.targetRange(), n = b - a;
+    this.channels.forEach(c => {
+      for (let i = a; i < b; i++) {
+        const p = (i - a) / n;
+        c[i] *= fadeIn ? p : 1 - p;
+      }
+    });
+    this.afterEdit();
+  }
+  normalize() {
+    this.pushUndo();
+    const [a, b] = this.targetRange();
+    let peak = 0;
+    this.channels.forEach(c => { for (let i = a; i < b; i++) { const v = Math.abs(c[i]); if (v > peak) peak = v; } });
+    if (peak > 0.0001) {
+      const g = 0.99 / peak;
+      this.channels.forEach(c => { for (let i = a; i < b; i++) c[i] *= g; });
+    }
+    this.afterEdit();
+  }
+  applyGain(g) { // 클리핑된 샘플 수를 돌려줌
+    this.pushUndo();
+    const [a, b] = this.targetRange();
+    let clipped = 0;
+    this.channels.forEach(c => {
+      for (let i = a; i < b; i++) {
+        const v = c[i] * g;
+        if (v > 1 || v < -1) clipped++;
+        c[i] = clamp(v, -1, 1);
+      }
+    });
+    this.afterEdit();
+    return clipped;
+  }
+  // 선택 구간(없으면 전체)의 채널 데이터 복사본
+  copyRange() {
+    const [a, b] = this.targetRange();
+    return this.channels.map(c => new Float32Array(c.subarray(a, b)));
+  }
+}
+
+// ============================================================
+// 편집기 두 개 생성: 원본(main) + 클립(clip)
+// ============================================================
+const main = new WaveEditor({
+  canvas: $("wave"), minimap: $("minimap"),
+  postext: $("postext"), seltext: $("seltext"),
+  metaEl: $("fmeta"), playBtn: $("btn-play"),
+});
+const clip = new WaveEditor({
+  canvas: $("clipwave"),
+  postext: $("clippostext"), seltext: $("clipseltext"),
+  metaEl: $("clipmeta"), playBtn: $("btn-clip-play"),
+  selHint: "클립 안에서도 드래그로 구간을 선택할 수 있어요",
+});
+focusedEditor = main;
+
+window.addEventListener("resize", () => {
+  main.resize();
+  if ($("clipsec").style.display !== "none" && clip.channels.length) clip.resize();
+});
 
 // ---------- 파일 열기 ----------
+const dropzone = $("dropzone");
 dropzone.addEventListener("click", () => $("fileinput").click());
 $("fileinput").addEventListener("change", (e) => { if (e.target.files[0]) loadFile(e.target.files[0]); });
 $("btn-newfile").addEventListener("click", () => $("fileinput").click());
@@ -268,310 +690,84 @@ dropzone.addEventListener("drop", (e) => { if (e.dataTransfer.files[0]) loadFile
 
 async function loadFile(file) {
   try {
-    stopPlayback();
-    if (!actx) {
-      actx = new (window.AudioContext || window.webkitAudioContext)();
-      gainNode = actx.createGain();
-      gainNode.connect(actx.destination);
-    }
-    if (actx.state === "suspended") actx.resume();
+    ensureCtx();
     dropzone.firstElementChild.textContent = "⏳";
     const buf = await file.arrayBuffer();
     const decoded = await new Promise((res, rej) => actx.decodeAudioData(buf, res, rej));
-    channels = [];
+    const chs = [];
     const nch = Math.min(2, decoded.numberOfChannels);
-    for (let c = 0; c < nch; c++) channels.push(new Float32Array(decoded.getChannelData(c)));
-    sampleRate = decoded.sampleRate;
-    fileName = file.name;
-    selStart = selEnd = null; cursor = 0; undoStack = [];
-    viewStart = 0; viewEnd = duration();
-    $("volslider").value = 100; $("volval").textContent = "100%";
-    gainNode.gain.value = 1;
-    $("fname").textContent = fileName;
-    updateMeta();
+    for (let c = 0; c < nch; c++) chs.push(new Float32Array(decoded.getChannelData(c)));
+    $("fname").textContent = file.name;
     dropzone.style.display = "none";
-    editor.style.display = "block";
-    resizeCanvas();
-    updateTimebar();
+    $("editor").style.display = "block";
+    $("clipsec").style.display = "none";
+    clip.channels = [];
+    $("volslider").value = 100; $("volval").textContent = "100%";
+    main.setAudio(chs, decoded.sampleRate, file.name);
+    if (main.gainNode) main.gainNode.gain.value = 1;
+    focusedEditor = main;
   } catch (err) {
     dropzone.firstElementChild.textContent = "🎧";
     alert("파일을 열 수 없습니다. 지원되는 오디오 파일인지 확인해 주세요.\n(" + err + ")");
   }
 }
-function updateMeta() {
-  $("fmeta").textContent = fmt(duration()) + " · " + (channels.length === 2 ? "스테레오" : "모노") + " · " + (sampleRate / 1000) + "kHz";
-}
 
-// ---------- 파형 그리기 ----------
-function resizeCanvas() {
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.floor(wavewrap.clientWidth * dpr);
-  canvas.height = Math.floor(220 * dpr);
-  draw();
-}
-window.addEventListener("resize", resizeCanvas);
-
-function draw() {
-  if (!channels.length) return;
-  clampView();
-  const W = canvas.width, H = canvas.height;
-  ctx2d.clearRect(0, 0, W, H);
-  const data = channels[0];
-  const s0v = Math.floor(viewStart * sampleRate);
-  const s1v = Math.min(data.length, Math.ceil(viewEnd * sampleRate));
-  const step = (s1v - s0v) / W;
-  const mid = H / 2, amp = H / 2 - 4;
-
-  // 파형 (픽셀당 최소/최대) — 최대치에 닿은(클리핑) 픽셀은 빨간색으로 표시
-  for (let x = 0; x < W; x++) {
-    let lo = 1, hi = -1;
-    const s0 = s0v + Math.floor(x * step), s1 = Math.min(s1v, s0v + Math.floor((x + 1) * step) + 1);
-    const stride = Math.max(1, Math.floor((s1 - s0) / 50));
-    for (let i = s0; i < s1; i += stride) {
-      const v = data[i];
-      if (v < lo) lo = v;
-      if (v > hi) hi = v;
-    }
-    if (hi < lo) continue;
-    ctx2d.fillStyle = (hi >= 0.999 || lo <= -0.999) ? "#ff6b6b" : "#5aa2ff";
-    const y1 = mid - hi * amp, y2 = mid - lo * amp;
-    ctx2d.fillRect(x, y1, 1, Math.max(1, y2 - y1));
-  }
-  // 중앙선
-  ctx2d.fillStyle = "rgba(255,255,255,0.15)";
-  ctx2d.fillRect(0, mid, W, 1);
-
-  // 선택 구간
-  if (hasSelection()) {
-    const a = timeToX(Math.min(selStart, selEnd), W);
-    const b = timeToX(Math.max(selStart, selEnd), W);
-    if (b > 0 && a < W) {
-      ctx2d.fillStyle = "rgba(79,140,255,0.28)";
-      ctx2d.fillRect(Math.max(0, a), 0, Math.min(W, b) - Math.max(0, a), H);
-      ctx2d.fillStyle = "#4f8cff";
-      ctx2d.fillRect(a, 0, 2, H);
-      ctx2d.fillRect(b - 2, 0, 2, H);
-    }
-  }
-
-  // 재생 커서
-  const t = playState ? currentPlayTime() : cursor;
-  const cx = timeToX(clamp(t, 0, duration()), W);
-  if (cx >= -2 && cx <= W + 2) {
-    ctx2d.fillStyle = "#37c993";
-    ctx2d.fillRect(cx - 1, 0, 2.5, H);
-  }
-}
-
-// ---------- 마우스 선택 ----------
-let dragging = false, dragStartX = 0;
-function xToTime(clientX) {
-  const r = canvas.getBoundingClientRect();
-  return viewStart + clamp((clientX - r.left) / r.width, 0, 1) * (viewEnd - viewStart);
-}
-canvas.addEventListener("mousedown", (e) => {
-  dragging = true; dragStartX = e.clientX;
-  selStart = xToTime(e.clientX); selEnd = selStart;
-  draw();
-});
-window.addEventListener("mousemove", (e) => {
-  if (!dragging) return;
-  selEnd = xToTime(e.clientX);
-  draw(); updateTimebar();
-});
-window.addEventListener("mouseup", (e) => {
-  if (!dragging) return;
-  dragging = false;
-  if (Math.abs(e.clientX - dragStartX) < 4) { // 클릭: 커서 이동
-    cursor = xToTime(e.clientX);
-    selStart = selEnd = null;
-  }
-  draw(); updateTimebar();
-});
-
-// ---------- 확대/축소 (마우스 휠 · 트랙패드) ----------
-function zoomAt(t, factor) {
-  const d = duration();
-  const minSpan = Math.max(0.02, 256 / sampleRate);
-  const span = clamp((viewEnd - viewStart) * factor, minSpan, d);
-  const frac = clamp((t - viewStart) / (viewEnd - viewStart), 0, 1);
-  viewStart = t - frac * span;
-  viewEnd = viewStart + span;
-  clampView(); draw(); updateTimebar();
-}
-canvas.addEventListener("wheel", (e) => {
-  if (!channels.length) return;
-  e.preventDefault();
-  if (e.deltaY) zoomAt(xToTime(e.clientX), Math.exp(e.deltaY * 0.0018));
-  if (e.deltaX) {
-    const shift = e.deltaX / canvas.getBoundingClientRect().width * (viewEnd - viewStart);
-    viewStart += shift; viewEnd += shift;
-    clampView(); draw(); updateTimebar();
-  }
-}, { passive: false });
-$("btn-zoomin").addEventListener("click", () => zoomAt((viewStart + viewEnd) / 2, 0.55));
-$("btn-zoomout").addEventListener("click", () => zoomAt((viewStart + viewEnd) / 2, 1 / 0.55));
-$("btn-zoomfit").addEventListener("click", () => { viewStart = 0; viewEnd = duration(); draw(); updateTimebar(); });
-
-function updateTimebar() {
-  const t = playState ? currentPlayTime() : cursor;
-  let pos = fmt(t) + " / " + fmt(duration());
-  if (viewEnd - viewStart < duration() - 0.01) pos += "  ·  🔍 " + fmt(viewStart) + " ~ " + fmt(viewEnd);
-  $("postext").textContent = pos;
-  $("seltext").textContent = hasSelection()
-    ? "선택: " + fmt(Math.min(selStart, selEnd)) + " ~ " + fmt(Math.max(selStart, selEnd)) + " (" + fmt(Math.abs(selEnd - selStart)) + ")"
-    : "파형을 드래그하면 구간이 선택됩니다";
-}
-
-// ---------- 재생 ----------
-function makeBuffer() {
-  const b = actx.createBuffer(channels.length, channels[0].length, sampleRate);
-  for (let c = 0; c < channels.length; c++) b.copyToChannel(channels[c], c);
-  return b;
-}
-function currentPlayTime() {
-  if (!playState) return cursor;
-  return playState.offset + (actx.currentTime - playState.ctxStart);
-}
-function startPlayback(from, to) {
-  stopPlayback();
-  if (actx.state === "suspended") actx.resume();
-  const source = actx.createBufferSource();
-  source.buffer = makeBuffer();
-  source.connect(gainNode); // 볼륨 슬라이더가 재생에 실시간 반영되도록 게인 노드를 거침
-  const dur = (to !== undefined ? to : duration()) - from;
-  if (dur <= 0) return;
-  source.start(0, from, dur);
-  playState = { source, ctxStart: actx.currentTime, offset: from, endAt: from + dur };
-  source.onended = () => {
-    if (playState && playState.source === source) {
-      cursor = playState.endAt >= duration() - 0.05 ? 0 : playState.endAt;
-      playState = null;
-      $("btn-play").textContent = "▶ 재생";
-      draw(); updateTimebar();
-    }
-  };
-  $("btn-play").textContent = "⏸ 일시정지";
-  animate();
-}
-function stopPlayback(keepPos) {
-  if (playState) {
-    if (keepPos) cursor = clamp(currentPlayTime(), 0, duration());
-    const s = playState.source;
-    playState = null;
-    try { s.onended = null; s.stop(); } catch (e) {}
-  }
-  $("btn-play").textContent = "▶ 재생";
-}
-function animate() {
-  if (!playState) return;
-  draw(); updateTimebar();
-  requestAnimationFrame(animate);
-}
-$("btn-play").addEventListener("click", () => {
-  if (playState) { stopPlayback(true); draw(); updateTimebar(); }
-  else startPlayback(hasSelection() ? Math.min(selStart, selEnd) : cursor);
-});
-$("btn-stop").addEventListener("click", () => { stopPlayback(false); cursor = hasSelection() ? Math.min(selStart, selEnd) : 0; draw(); updateTimebar(); });
+// ---------- 원본 편집기 버튼 ----------
+$("btn-play").addEventListener("click", () => main.toggle());
+$("btn-stop").addEventListener("click", () => { main.stop(false); main.cursor = main.hasSelection() ? Math.min(main.selStart, main.selEnd) : 0; main.draw(); main.updateTimebar(); });
 $("btn-playsel").addEventListener("click", () => {
-  if (!hasSelection()) { alert("먼저 파형에서 구간을 드래그해서 선택해 주세요."); return; }
-  startPlayback(Math.min(selStart, selEnd), Math.max(selStart, selEnd));
+  if (!main.requireSelection()) return;
+  main.play(Math.min(main.selStart, main.selEnd), Math.max(main.selStart, main.selEnd));
 });
+$("btn-zoomin").addEventListener("click", () => main.zoomAt((main.viewStart + main.viewEnd) / 2, 0.55));
+$("btn-zoomout").addEventListener("click", () => main.zoomAt((main.viewStart + main.viewEnd) / 2, 1 / 0.55));
+$("btn-zoomfit").addEventListener("click", () => main.zoomFit());
+$("btn-delete").addEventListener("click", () => main.del());
+$("btn-crop").addEventListener("click", () => main.crop());
+$("btn-silence").addEventListener("click", () => main.silence());
+$("btn-fadein").addEventListener("click", () => main.fade(true));
+$("btn-fadeout").addEventListener("click", () => main.fade(false));
+$("btn-normalize").addEventListener("click", () => main.normalize());
+$("btn-undo").addEventListener("click", () => main.undo());
 
-// ---------- 편집 ----------
-function pushUndo() {
-  undoStack.push({ channels: channels.map(c => new Float32Array(c)), selStart, selEnd, cursor });
-  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
-}
-function afterEdit() {
-  stopPlayback(false);
-  cursor = clamp(cursor, 0, duration());
-  updateMeta(); draw(); updateTimebar();
-}
-function requireSelection() {
-  if (!hasSelection()) { alert("먼저 파형에서 구간을 드래그해서 선택해 주세요."); return false; }
-  return true;
-}
-
-$("btn-delete").addEventListener("click", doDelete);
-function doDelete() {
-  if (!requireSelection()) return;
-  pushUndo();
-  const [a, b] = selRange();
-  channels = channels.map(c => {
-    const out = new Float32Array(c.length - (b - a));
-    out.set(c.subarray(0, a), 0);
-    out.set(c.subarray(b), a);
-    return out;
-  });
-  cursor = a / sampleRate;
-  selStart = selEnd = null;
-  afterEdit();
-}
-
-$("btn-crop").addEventListener("click", () => {
-  if (!requireSelection()) return;
-  pushUndo();
-  const [a, b] = selRange();
-  channels = channels.map(c => new Float32Array(c.subarray(a, b)));
-  cursor = 0; selStart = selEnd = null;
-  afterEdit();
+// ---------- 클립 편집기 ----------
+$("btn-toclip").addEventListener("click", () => {
+  if (!main.requireSelection()) return;
+  const name = main.fileName.replace(/\.[^.]+$/, "") + "_클립";
+  $("clipsec").style.display = "block";
+  clip.setAudio(main.copyRange(), main.sampleRate, name);
+  focusedEditor = clip;
+  clip.resize();
+  $("clipsec").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  status("✂️ 선택 구간을 클립 편집기로 복사했습니다. 원본은 그대로예요.");
 });
-
-$("btn-silence").addEventListener("click", () => {
-  pushUndo();
-  const [a, b] = targetRange();
-  channels.forEach(c => c.fill(0, a, b));
-  afterEdit();
+$("btn-clip-close").addEventListener("click", () => {
+  clip.stop(false);
+  clip.channels = [];
+  $("clipsec").style.display = "none";
+  focusedEditor = main;
 });
+$("btn-clip-play").addEventListener("click", () => clip.toggle());
+$("btn-clip-stop").addEventListener("click", () => { clip.stop(false); clip.cursor = 0; clip.draw(); clip.updateTimebar(); });
+$("btn-clip-delete").addEventListener("click", () => clip.del());
+$("btn-clip-crop").addEventListener("click", () => clip.crop());
+$("btn-clip-fadein").addEventListener("click", () => clip.fade(true));
+$("btn-clip-fadeout").addEventListener("click", () => clip.fade(false));
+$("btn-clip-normalize").addEventListener("click", () => clip.normalize());
+$("btn-clip-undo").addEventListener("click", () => clip.undo());
 
-$("btn-fadein").addEventListener("click", () => applyFade(true));
-$("btn-fadeout").addEventListener("click", () => applyFade(false));
-function applyFade(fadeIn) {
-  pushUndo();
-  const [a, b] = targetRange(), n = b - a;
-  channels.forEach(c => {
-    for (let i = a; i < b; i++) {
-      const p = (i - a) / n;
-      c[i] *= fadeIn ? p : 1 - p;
-    }
-  });
-  afterEdit();
-}
-
-$("btn-normalize").addEventListener("click", () => {
-  pushUndo();
-  const [a, b] = targetRange();
-  let peak = 0;
-  channels.forEach(c => { for (let i = a; i < b; i++) { const v = Math.abs(c[i]); if (v > peak) peak = v; } });
-  if (peak > 0.0001) {
-    const g = 0.99 / peak;
-    channels.forEach(c => { for (let i = a; i < b; i++) c[i] *= g; });
-  }
-  afterEdit();
-});
-
-// 슬라이더는 재생 소리에 즉시 반영(미리듣기), '파일에 적용'을 눌러야 실제 데이터에 반영
+// ---------- 볼륨 (원본 편집기 전용) ----------
 $("volslider").addEventListener("input", () => {
   $("volval").textContent = $("volslider").value + "%";
-  if (gainNode) gainNode.gain.value = $("volslider").value / 100;
+  ensureCtx();
+  if (!main.gainNode) { main.gainNode = actx.createGain(); main.gainNode.connect(actx.destination); }
+  main.gainNode.gain.value = $("volslider").value / 100;
 });
 $("btn-volume").addEventListener("click", () => {
   const g = $("volslider").value / 100;
-  pushUndo();
-  const [a, b] = targetRange();
-  let clipped = 0;
-  channels.forEach(c => {
-    for (let i = a; i < b; i++) {
-      const v = c[i] * g;
-      if (v > 1 || v < -1) clipped++;
-      c[i] = clamp(v, -1, 1);
-    }
-  });
-  // 적용 후 미리듣기 볼륨은 원점(100%)으로 — 두 번 적용되는 것을 방지
+  const clipped = main.applyGain(g);
   $("volslider").value = 100; $("volval").textContent = "100%";
-  if (gainNode) gainNode.gain.value = 1;
-  afterEdit();
+  if (main.gainNode) main.gainNode.gain.value = 1;
   if (clipped > 0) {
     status("⚠️ 소리가 최대 한계를 넘어 일부가 잘렸습니다(클리핑 — 파형의 빨간 부분). 음질이 거칠어졌다면 ‘실행 취소’ 후 ‘음량 최적화’를 사용해 보세요. 최적화는 소리가 잘리지 않는 한도까지만 키워줍니다.");
   } else {
@@ -583,19 +779,20 @@ $("btn-volume").addEventListener("click", () => {
 // 원리: 스테레오 음원에서 목소리는 보통 가운데에 있으므로 좌우 평균(센터)을 취하고,
 // 사람 목소리 대역(약 120Hz~6kHz)만 통과시키는 필터를 걸어 배경음을 상대적으로 줄임
 $("btn-voice").addEventListener("click", async () => {
-  pushUndo();
-  const [a, b] = targetRange();
+  const ed = main;
+  ed.pushUndo();
+  const [a, b] = ed.targetRange();
   const n = b - a;
   const mono = new Float32Array(n);
-  if (channels.length === 2) {
-    for (let i = 0; i < n; i++) mono[i] = (channels[0][a + i] + channels[1][a + i]) / 2;
+  if (ed.channels.length === 2) {
+    for (let i = 0; i < n; i++) mono[i] = (ed.channels[0][a + i] + ed.channels[1][a + i]) / 2;
   } else {
-    mono.set(channels[0].subarray(a, b));
+    mono.set(ed.channels[0].subarray(a, b));
   }
   try {
     const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-    const oc = new OAC(1, n, sampleRate);
-    const buf = oc.createBuffer(1, n, sampleRate);
+    const oc = new OAC(1, n, ed.sampleRate);
+    const buf = oc.createBuffer(1, n, ed.sampleRate);
     buf.copyToChannel(mono, 0);
     const src = oc.createBufferSource(); src.buffer = buf;
     const hp = oc.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 120; hp.Q.value = 0.7;
@@ -605,33 +802,26 @@ $("btn-voice").addEventListener("click", async () => {
     src.start();
     const rendered = await oc.startRendering();
     const out = rendered.getChannelData(0);
-    channels.forEach(c => { for (let i = 0; i < n; i++) c[a + i] = clamp(out[i], -1, 1); });
-    afterEdit();
+    ed.channels.forEach(c => { for (let i = 0; i < n; i++) c[a + i] = clamp(out[i], -1, 1); });
+    ed.afterEdit();
     status("🎤 목소리 대역을 강조했습니다. 배경음이 완전히 사라지지는 않아요 — 마음에 들지 않으면 ‘실행 취소’ 하세요.");
   } catch (err) {
-    undoStack.pop();
+    ed.undoStack.pop();
     alert("이 브라우저에서는 목소리 강조 기능을 사용할 수 없습니다.\n(" + err + ")");
   }
 });
 
-$("btn-undo").addEventListener("click", doUndo);
-function doUndo() {
-  const s = undoStack.pop();
-  if (!s) { return; }
-  channels = s.channels; selStart = s.selStart; selEnd = s.selEnd; cursor = s.cursor;
-  afterEdit();
-}
-
-// ---------- 키보드 ----------
+// ---------- 키보드 (마지막에 클릭한 파형에 적용) ----------
 window.addEventListener("keydown", (e) => {
-  if (!channels.length) return;
+  const ed = focusedEditor;
+  if (!ed || !ed.channels.length) return;
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
-  if (e.code === "Space") { e.preventDefault(); $("btn-play").click(); }
-  else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); doDelete(); }
-  else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); doUndo(); }
+  if (e.code === "Space") { e.preventDefault(); ed.toggle(); }
+  else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); ed.del(); }
+  else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); ed.undo(); }
 });
 
-// ---------- 내보내기 ----------
+// ---------- 저장 ----------
 function setProgress(pct, text) {
   const wrap = $("progresswrap");
   if (pct === null) { wrap.style.display = "none"; return; }
@@ -647,41 +837,41 @@ function downloadBlob(blob, name) {
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
 }
-function baseName() { return fileName.replace(/\.[^.]+$/, "") || "audio"; }
-// 저장 범위 결정: '선택 구간만 저장'이면 선택 부분만 잘라서 별도 파일로 만든다 (원본 편집 상태는 그대로 유지)
-function exportChannels() {
-  if ($("savescope").value === "sel") {
-    if (!hasSelection()) {
-      alert("‘선택 구간만 저장’을 사용하려면 먼저 파형에서 구간을 드래그로 선택해 주세요.");
-      return null;
-    }
-    const [a, b] = selRange();
-    return { chs: channels.map(c => c.subarray(a, b)), suffix: "_선택구간" };
+// 저장 위치 선택: Chrome 등은 폴더/이름 선택 창을 띄우고, 미지원 브라우저는 다운로드 폴더로
+async function pickSaveTarget(suggestedName, mime, ext) {
+  if (!window.showSaveFilePicker) return { mode: "download" };
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName,
+      types: [{ description: "오디오 파일", accept: { [mime]: [ext] } }],
+    });
+    return { mode: "picker", handle };
+  } catch (e) {
+    if (e && e.name === "AbortError") return { mode: "cancel" }; // 사용자가 취소함
+    return { mode: "download" };
   }
-  return { chs: channels, suffix: "_편집본" };
 }
-function floatTo16(f32, from, to) {
-  const out = new Int16Array(to - from);
-  for (let i = from; i < to; i++) {
-    const s = clamp(f32[i], -1, 1);
-    out[i - from] = s < 0 ? s * 32768 : s * 32767;
+async function finishSave(target, blob, suggestedName) {
+  if (target.mode === "picker") {
+    const w = await target.handle.createWritable();
+    await w.write(blob);
+    await w.close();
+    status("✅ 저장 완료: " + target.handle.name);
+  } else {
+    downloadBlob(blob, suggestedName);
+    status("📥 다운로드 폴더에 저장했습니다. (이 브라우저는 저장 위치 선택을 지원하지 않아요 — Chrome에서는 폴더를 고를 수 있습니다)");
   }
-  return out;
 }
-
-// WAV 저장
-$("btn-wav").addEventListener("click", () => {
-  const ex = exportChannels();
-  if (!ex) return;
-  const chs = ex.chs, nch = chs.length, N = chs[0].length;
-  const bytesPerSample = 2, blockAlign = nch * bytesPerSample;
+function makeWavBlob(chs, sr) {
+  const nch = chs.length, N = chs[0].length;
+  const blockAlign = nch * 2;
   const buf = new ArrayBuffer(44 + N * blockAlign);
   const v = new DataView(buf);
   const wstr = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
   wstr(0, "RIFF"); v.setUint32(4, 36 + N * blockAlign, true); wstr(8, "WAVE");
   wstr(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
-  v.setUint16(22, nch, true); v.setUint32(24, sampleRate, true);
-  v.setUint32(28, sampleRate * blockAlign, true); v.setUint16(32, blockAlign, true); v.setUint16(34, 16, true);
+  v.setUint16(22, nch, true); v.setUint32(24, sr, true);
+  v.setUint32(28, sr * blockAlign, true); v.setUint16(32, blockAlign, true); v.setUint16(34, 16, true);
   wstr(36, "data"); v.setUint32(40, N * blockAlign, true);
   let o = 44;
   for (let i = 0; i < N; i++) {
@@ -691,44 +881,93 @@ $("btn-wav").addEventListener("click", () => {
       o += 2;
     }
   }
-  downloadBlob(new Blob([buf], { type: "audio/wav" }), baseName() + ex.suffix + ".wav");
-});
-
-// MP3 저장 (lamejs, UI가 멈추지 않도록 조각 단위로 인코딩)
-$("btn-mp3").addEventListener("click", () => {
-  if (typeof lamejs === "undefined") {
-    alert("MP3 인코더(lame.min.js)를 찾을 수 없습니다. index.html과 같은 폴더에 lame.min.js가 있는지 확인해 주세요.\nWAV로 저장 기능은 사용할 수 있습니다.");
-    return;
+  return new Blob([buf], { type: "audio/wav" });
+}
+function floatTo16(f32, from, to) {
+  const out = new Int16Array(to - from);
+  for (let i = from; i < to; i++) {
+    const s = clamp(f32[i], -1, 1);
+    out[i - from] = s < 0 ? s * 32768 : s * 32767;
   }
-  const ex = exportChannels();
-  if (!ex) return;
-  const chs = ex.chs;
-  const kbps = parseInt($("bitrate").value, 10);
-  const nch = chs.length, N = chs[0].length;
-  const enc = new lamejs.Mp3Encoder(nch, sampleRate, kbps);
-  const parts = [];
-  const CHUNK = 1152 * 40;
-  let pos = 0;
-  $("btn-mp3").disabled = true; $("btn-wav").disabled = true;
-
-  function step() {
-    const end = Math.min(N, pos + CHUNK);
-    let out;
-    if (nch === 2) out = enc.encodeBuffer(floatTo16(chs[0], pos, end), floatTo16(chs[1], pos, end));
-    else out = enc.encodeBuffer(floatTo16(chs[0], pos, end));
-    if (out.length) parts.push(out);
-    pos = end;
-    setProgress(Math.round(pos / N * 100), "MP3 변환 중… " + Math.round(pos / N * 100) + "%");
-    if (pos < N) setTimeout(step, 0);
-    else {
-      const tail = enc.flush();
-      if (tail.length) parts.push(tail);
-      downloadBlob(new Blob(parts, { type: "audio/mp3" }), baseName() + ex.suffix + ".mp3");
-      setProgress(null);
-      $("btn-mp3").disabled = false; $("btn-wav").disabled = false;
+  return out;
+}
+function encodeMp3(chs, sr, kbps) { // UI가 멈추지 않도록 조각 단위로 인코딩
+  return new Promise((resolve, reject) => {
+    if (typeof lamejs === "undefined") {
+      reject(new Error("MP3 인코더(lame.min.js)를 찾을 수 없습니다. index.html과 같은 폴더에 lame.min.js가 있어야 합니다."));
+      return;
     }
+    const nch = chs.length, N = chs[0].length;
+    const enc = new lamejs.Mp3Encoder(nch, sr, kbps);
+    const parts = [];
+    const CHUNK = 1152 * 40;
+    let pos = 0;
+    function step() {
+      const end = Math.min(N, pos + CHUNK);
+      let out;
+      if (nch === 2) out = enc.encodeBuffer(floatTo16(chs[0], pos, end), floatTo16(chs[1], pos, end));
+      else out = enc.encodeBuffer(floatTo16(chs[0], pos, end));
+      if (out.length) parts.push(out);
+      pos = end;
+      setProgress(Math.round(pos / N * 100), "MP3 변환 중… " + Math.round(pos / N * 100) + "%");
+      if (pos < N) setTimeout(step, 0);
+      else {
+        const tail = enc.flush();
+        if (tail.length) parts.push(tail);
+        setProgress(null);
+        resolve(new Blob(parts, { type: "audio/mp3" }));
+      }
+    }
+    step();
+  });
+}
+// 원본 저장 시 범위(전체/선택 구간) 결정
+function mainExport() {
+  if ($("savescope").value === "sel") {
+    if (!main.hasSelection()) {
+      alert("‘선택 구간만 저장’을 사용하려면 먼저 파형에서 구간을 드래그로 선택해 주세요.");
+      return null;
+    }
+    const [a, b] = main.selRange();
+    return { chs: main.channels.map(c => c.subarray(a, b)), name: main.fileName.replace(/\.[^.]+$/, "") + "_선택구간" };
   }
-  step();
+  return { chs: main.channels, name: main.fileName.replace(/\.[^.]+$/, "") + "_편집본" };
+}
+async function saveAudio(chs, sr, name, format) {
+  const mp3Btns = [$("btn-mp3"), $("btn-clip-mp3"), $("btn-wav"), $("btn-clip-wav")];
+  try {
+    if (format === "wav") {
+      const target = await pickSaveTarget(name + ".wav", "audio/wav", ".wav");
+      if (target.mode === "cancel") { status("저장을 취소했습니다."); return; }
+      await finishSave(target, makeWavBlob(chs, sr), name + ".wav");
+    } else {
+      // 폴더 선택 창은 버튼 클릭 직후에만 띄울 수 있어서, 변환 전에 먼저 위치를 묻는다
+      const target = await pickSaveTarget(name + ".mp3", "audio/mpeg", ".mp3");
+      if (target.mode === "cancel") { status("저장을 취소했습니다."); return; }
+      mp3Btns.forEach(b => b.disabled = true);
+      const blob = await encodeMp3(chs, sr, parseInt($("bitrate").value, 10));
+      await finishSave(target, blob, name + ".mp3");
+    }
+  } catch (err) {
+    setProgress(null);
+    alert("저장 중 문제가 발생했습니다.\n(" + err + ")");
+  } finally {
+    mp3Btns.forEach(b => b.disabled = false);
+  }
+}
+$("btn-wav").addEventListener("click", () => {
+  const ex = mainExport();
+  if (ex) saveAudio(ex.chs, main.sampleRate, ex.name, "wav");
+});
+$("btn-mp3").addEventListener("click", () => {
+  const ex = mainExport();
+  if (ex) saveAudio(ex.chs, main.sampleRate, ex.name, "mp3");
+});
+$("btn-clip-wav").addEventListener("click", () => {
+  if (clip.channels.length) saveAudio(clip.channels, clip.sampleRate, clip.fileName, "wav");
+});
+$("btn-clip-mp3").addEventListener("click", () => {
+  if (clip.channels.length) saveAudio(clip.channels, clip.sampleRate, clip.fileName, "mp3");
 });
 </script>
 </body>
