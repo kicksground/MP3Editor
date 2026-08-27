@@ -101,6 +101,18 @@
     border-top: 2px solid #2a2e3a;
   }
   .clipsec .fileinfo b { color: var(--accent2); }
+  .clipsec.dragging { opacity: .65; outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 10px; }
+  .drag-handle {
+    cursor: grab; color: var(--muted); font-size: 17px;
+    padding: 2px 8px; user-select: none; -webkit-user-select: none;
+    border: 1px solid #333949; border-radius: 8px; background: var(--panel2);
+  }
+  .drag-handle:hover { color: var(--text); border-color: var(--accent); }
+  .joinpick {
+    font-size: 12px; color: var(--muted); display: flex; align-items: center;
+    gap: 5px; cursor: pointer; user-select: none; -webkit-user-select: none;
+  }
+  .joinpick input { accent-color: var(--accent); width: 15px; height: 15px; }
 
   #progresswrap { margin-top: 12px; display: none; }
   #progressouter { background: var(--panel2); border-radius: 6px; height: 10px; overflow: hidden; }
@@ -210,7 +222,8 @@
       &nbsp;·&nbsp; 구간을 선택하지 않으면 볼륨·페이드·무음은 전체에 적용됩니다.
       &nbsp;·&nbsp; 볼륨 슬라이더는 재생 소리에 바로 반영되고, ‘파일에 적용’을 눌러야 저장에도 반영됩니다.
       &nbsp;·&nbsp; <b>⬇️ 선택을 새 클립으로</b>: 원본은 그대로 두고 선택 부분을 아래 클립으로 복사해 따로 편집·저장합니다. 여러 번 눌러 계속 추가할 수 있어요.
-      &nbsp;·&nbsp; <b>🔗 클립 이어 붙이기</b>: 열려 있는 클립들을 위에서부터 순서대로 연결한 새 클립을 만듭니다.
+      &nbsp;·&nbsp; <b>🔗 클립 이어 붙이기</b>: ‘이어 붙이기 포함’에 체크된 클립들을 화면 위에서부터 순서대로 연결한 새 클립을 만듭니다.
+      &nbsp;·&nbsp; 클립 왼쪽 위의 <b>⠿ 손잡이를 드래그</b>하면 클립 순서를 바꿀 수 있습니다.
       &nbsp;·&nbsp; 파형의 <b style="color:var(--danger)">빨간 부분</b>은 소리가 최대 한계에 닿아 잘린(클리핑) 곳입니다.
       &nbsp;·&nbsp; 저장 시 Chrome에서는 폴더를 직접 고를 수 있고, 위치 선택을 지원하지 않는 브라우저(Safari 등)는 다운로드 폴더에 저장됩니다.
     </div>
@@ -744,7 +757,10 @@ function createClip(chs, sr, base, kind) {
   sec.className = "clipsec";
   sec.innerHTML = `
     <div class="fileinfo">
+      <span class="drag-handle" title="드래그해서 클립 순서 바꾸기">⠿</span>
       <span>✂️ <b>${label}</b> &nbsp; <span class="clipmeta"></span></span>
+      <span style="flex:1"></span>
+      <label class="joinpick" title="체크된 클립만 '클립 이어 붙이기'에 포함됩니다"><input type="checkbox" class="c-join" checked> 이어 붙이기 포함</label>
       <button class="c-close">✕ 클립 닫기</button>
     </div>
     <div class="wavewrap"><canvas class="wave"></canvas></div>
@@ -808,11 +824,52 @@ $("btn-toclip").addEventListener("click", () => {
   status("✂️ 선택 구간을 새 클립으로 복사했습니다. 원본은 그대로예요.");
 });
 
-// ---------- 클립 이어 붙이기: 열려 있는 클립을 위에서부터 순서대로 연결한 새 클립 생성 ----------
+// ---------- 클립 순서 드래그로 바꾸기 (⠿ 손잡이) ----------
+(function setupClipReorder() {
+  let dragSec = null;
+  document.addEventListener("mousedown", (e) => {
+    const h = e.target.closest(".drag-handle");
+    if (!h) return;
+    e.preventDefault();
+    dragSec = h.closest(".clipsec");
+    dragSec.classList.add("dragging");
+    document.body.style.cursor = "grabbing";
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (!dragSec) return;
+    // 화면 위/아래 가장자리에 닿으면 자동 스크롤 (클립이 많을 때 위아래로 끌고 가기 위함)
+    if (e.clientY < 90) window.scrollBy(0, -30);
+    else if (e.clientY > window.innerHeight - 90) window.scrollBy(0, 30);
+    // 마우스 세로 위치에 따라 다른 클립들 사이로 끼워 넣는다
+    const container = $("clips");
+    const others = Array.from(container.children).filter(s => s !== dragSec);
+    let target = null;
+    for (const s of others) {
+      const r = s.getBoundingClientRect();
+      if (e.clientY < r.top + r.height / 2) { target = s; break; }
+    }
+    if (target) container.insertBefore(dragSec, target);
+    else container.appendChild(dragSec);
+  });
+  document.addEventListener("mouseup", () => {
+    if (!dragSec) return;
+    dragSec.classList.remove("dragging");
+    document.body.style.cursor = "";
+    // 내부 목록 순서를 화면 순서와 일치시키고 파형을 다시 그린다
+    const order = Array.from($("clips").children);
+    clipEntries.sort((a, b) => order.indexOf(a.section) - order.indexOf(b.section));
+    clipEntries.forEach(en => en.editor.draw());
+    dragSec = null;
+  });
+})();
+
+// ---------- 클립 이어 붙이기: '이어 붙이기 포함'에 체크된 클립을 화면 순서대로 연결 ----------
 $("btn-joinclips").addEventListener("click", () => {
-  const list = clipEntries.map(e => e.editor).filter(ed => ed.channels.length);
+  const list = clipEntries
+    .filter(en => en.editor.channels.length && en.section.querySelector(".c-join").checked)
+    .map(en => en.editor);
   if (list.length < 2) {
-    alert("이어 붙이려면 클립이 2개 이상 필요합니다.\n먼저 ‘⬇️ 선택을 새 클립으로’로 클립을 만들어 주세요.");
+    alert("이어 붙이려면 ‘이어 붙이기 포함’에 체크된 클립이 2개 이상 필요합니다.\n각 클립 오른쪽 위의 체크박스로 포함 여부를 고를 수 있어요.");
     return;
   }
   const sr = list[0].sampleRate;
@@ -835,7 +892,9 @@ $("btn-joinclips").addEventListener("click", () => {
     chs.push(out);
   }
   createClip(chs, sr, main.fileName.replace(/\.[^.]+$/, ""), "합본");
-  status("🔗 클립 " + list.length + "개를 순서대로 이어 붙여 새 클립(합본)을 만들었습니다. 아래에서 확인하세요.");
+  // 합본이 다음 이어 붙이기에 또 포함되는 실수를 막기 위해 기본은 체크 해제
+  clipEntries[clipEntries.length - 1].section.querySelector(".c-join").checked = false;
+  status("🔗 체크된 클립 " + list.length + "개를 순서대로 이어 붙여 새 클립(합본)을 만들었습니다. 아래에서 확인하세요.");
 });
 
 // ---------- 볼륨 (원본 편집기 전용) ----------
