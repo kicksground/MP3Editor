@@ -149,6 +149,7 @@
     오디오 파일을 여기로 <b>드래그</b>하거나 <b>클릭</b>해서 선택하세요<br>
     <span style="font-size:13px">MP3 · WAV · M4A · AAC · OGG · 동영상(MP4)의 소리 지원</span>
     <div style="margin-top:20px"><button id="btn-record-dz">🎙️ 마이크로 바로 녹음하기</button></div>
+    <div style="margin-top:10px"><select id="micselect-dz" title="녹음에 사용할 마이크" style="max-width:260px"></select></div>
     <input type="file" id="fileinput" accept="audio/*,video/*" hidden>
   </div>
 
@@ -175,6 +176,7 @@
       <button id="btn-redo">↪️ 다시 실행</button>
       <span class="divider"></span>
       <button id="btn-record">🎙️ 녹음</button>
+      <select id="micselect" title="녹음에 사용할 마이크" style="max-width:190px"></select>
       <span style="flex:1"></span>
       <span class="label" style="min-width:auto">보기</span>
       <button id="btn-zoomin">🔍＋</button>
@@ -1018,6 +1020,44 @@ $("btn-voice").addEventListener("click", async () => {
 // 파일을 열기 전이면 녹음이 원본 편집기로, 편집 중이면 새 클립으로 들어간다
 let recState = null; // { rec, chunks, stream, startAt, timer }
 let recCounter = 0;
+let micId = ""; // 선택된 마이크 장치 id ("" = 기본 마이크)
+
+// 마이크 목록 채우기 — 장치 이름은 브라우저 정책상 첫 권한 허용 이후에만 보인다
+async function refreshMicList() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  try {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const mics = devs.filter(d => d.kind === "audioinput" && d.deviceId && d.deviceId !== "default");
+    [$("micselect"), $("micselect-dz")].forEach(sel => {
+      sel.innerHTML = "";
+      const def = document.createElement("option");
+      def.value = "";
+      def.textContent = "🎙 기본 마이크";
+      sel.appendChild(def);
+      mics.forEach((m, i) => {
+        const o = document.createElement("option");
+        o.value = m.deviceId;
+        o.textContent = m.label || ("마이크 " + (i + 1));
+        sel.appendChild(o);
+      });
+      sel.value = micId;
+      if (sel.value !== micId) sel.value = ""; // 선택했던 장치가 사라졌으면 기본으로
+    });
+    if ($("micselect").value !== micId) micId = $("micselect").value;
+  } catch (e) { /* 목록을 못 읽어도 기본 마이크로 녹음은 가능 */ }
+}
+function onMicChange(e) {
+  micId = e.target.value;
+  $("micselect").value = micId;
+  $("micselect-dz").value = micId;
+}
+$("micselect").addEventListener("change", onMicChange);
+$("micselect-dz").addEventListener("change", onMicChange);
+$("micselect-dz").addEventListener("click", (e) => e.stopPropagation()); // 드롭존 클릭(파일 열기)과 겹치지 않게
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+  navigator.mediaDevices.addEventListener("devicechange", refreshMicList);
+}
+refreshMicList();
 
 function updateRecUI() {
   const running = !!recState;
@@ -1036,12 +1076,25 @@ async function toggleRecord() {
     return;
   }
   let stream;
+  const constraint = micId ? { audio: { deviceId: { exact: micId } } } : { audio: true };
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream = await navigator.mediaDevices.getUserMedia(constraint);
   } catch (err) {
-    alert("마이크를 사용할 수 없습니다.\n브라우저가 마이크 권한을 물어보면 ‘허용’을 눌러 주세요.\n(맥 설정 → 개인정보 보호 및 보안 → 마이크에서 브라우저 허용도 확인)\n\n" + err);
-    return;
+    if (micId) {
+      // 선택한 마이크를 못 열면 기본 마이크로 다시 시도
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        status("⚠️ 선택한 마이크를 열 수 없어 기본 마이크로 녹음합니다.");
+      } catch (err2) {
+        alert("마이크를 사용할 수 없습니다.\n브라우저가 마이크 권한을 물어보면 ‘허용’을 눌러 주세요.\n(맥 설정 → 개인정보 보호 및 보안 → 마이크에서 브라우저 허용도 확인)\n\n" + err2);
+        return;
+      }
+    } else {
+      alert("마이크를 사용할 수 없습니다.\n브라우저가 마이크 권한을 물어보면 ‘허용’을 눌러 주세요.\n(맥 설정 → 개인정보 보호 및 보안 → 마이크에서 브라우저 허용도 확인)\n\n" + err);
+      return;
+    }
   }
+  refreshMicList(); // 권한이 허용된 뒤에는 장치 이름이 보이므로 목록 갱신
   let mime = "";
   for (const m of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]) {
     if (MediaRecorder.isTypeSupported(m)) { mime = m; break; }
