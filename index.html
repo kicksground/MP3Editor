@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MP3 편집기</title>
+<style>
+  :root {
+    --bg: #12141a;
+    --panel: #1c1f27;
+    --panel2: #242833;
+    --text: #e8eaf0;
+    --muted: #9aa1b0;
+    --accent: #4f8cff;
+    --accent2: #37c993;
+    --danger: #ff6b6b;
+    --wave: #5aa2ff;
+    --sel: rgba(79, 140, 255, 0.25);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 18px 24px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    border-bottom: 1px solid #2a2e3a;
+  }
+  header h1 { font-size: 20px; font-weight: 700; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  main { flex: 1; padding: 20px 24px; max-width: 1100px; width: 100%; margin: 0 auto; }
+
+  #dropzone {
+    border: 2px dashed #3a4152;
+    border-radius: 14px;
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--muted);
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    font-size: 16px;
+    line-height: 1.8;
+  }
+  #dropzone:hover, #dropzone.drag { border-color: var(--accent); background: rgba(79,140,255,.06); color: var(--text); }
+  #dropzone .big { font-size: 40px; display: block; margin-bottom: 8px; }
+
+  #editor { display: none; }
+  #fileinfo {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px; font-size: 13px; color: var(--muted);
+    flex-wrap: wrap; gap: 8px;
+  }
+  #fileinfo b { color: var(--text); font-size: 14px; }
+
+  #wavewrap { position: relative; background: var(--panel); border-radius: 10px; overflow: hidden; }
+  canvas#wave { display: block; width: 100%; height: 220px; cursor: text; }
+
+  #timebar {
+    display: flex; justify-content: space-between; padding: 6px 2px;
+    font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+
+  .toolbar {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    background: var(--panel); border-radius: 10px; padding: 10px 12px; margin-top: 10px;
+  }
+  .toolbar .label { font-size: 12px; color: var(--muted); margin-right: 2px; min-width: 58px; }
+  button {
+    background: var(--panel2); color: var(--text);
+    border: 1px solid #333949; border-radius: 8px;
+    padding: 8px 14px; font-size: 13px; cursor: pointer;
+    transition: background .12s, border-color .12s;
+    font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2d3342; border-color: var(--accent); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.primary:hover:not(:disabled) { background: #3d7bf0; }
+  button.green { background: var(--accent2); border-color: var(--accent2); color: #06281c; font-weight: 600; }
+  button.green:hover:not(:disabled) { background: #2fb583; }
+  select, input[type=range] { accent-color: var(--accent); }
+  select {
+    background: var(--panel2); color: var(--text);
+    border: 1px solid #333949; border-radius: 8px; padding: 7px 8px; font-size: 13px;
+    font-family: inherit;
+  }
+  #volval { font-size: 12px; color: var(--muted); min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  #progresswrap { margin-top: 12px; display: none; }
+  #progressouter { background: var(--panel2); border-radius: 6px; height: 10px; overflow: hidden; }
+  #progressbar { background: var(--accent2); height: 100%; width: 0%; transition: width .1s; }
+  #progresstext { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  #hint { margin-top: 14px; font-size: 12.5px; color: var(--muted); line-height: 1.8; }
+  #hint kbd {
+    background: var(--panel2); border: 1px solid #3a4152; border-radius: 4px;
+    padding: 1px 6px; font-size: 11px; font-family: inherit;
+  }
+  footer { padding: 14px 24px; font-size: 11px; color: #5b6172; text-align: center; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎵 MP3 편집기</h1>
+  <span class="sub">설치 없이 브라우저에서 바로 쓰는 오디오 편집기</span>
+</header>
+
+<main>
+  <div id="dropzone">
+    <span class="big">🎧</span>
+    오디오 파일을 여기로 <b>드래그</b>하거나 <b>클릭</b>해서 선택하세요<br>
+    <span style="font-size:13px">MP3 · WAV · M4A · AAC · OGG 지원</span>
+    <input type="file" id="fileinput" accept="audio/*" hidden>
+  </div>
+
+  <div id="editor">
+    <div id="fileinfo">
+      <span><b id="fname"></b> &nbsp; <span id="fmeta"></span></span>
+      <button id="btn-newfile">다른 파일 열기</button>
+    </div>
+
+    <div id="wavewrap">
+      <canvas id="wave"></canvas>
+    </div>
+    <div id="timebar">
+      <span id="postext">0:00.0 / 0:00.0</span>
+      <span id="seltext">파형을 드래그하면 구간이 선택됩니다</span>
+    </div>
+
+    <div class="toolbar">
+      <span class="label">재생</span>
+      <button id="btn-play" class="primary">▶ 재생</button>
+      <button id="btn-stop">⏹ 정지</button>
+      <button id="btn-playsel">🔁 선택 구간 재생</button>
+    </div>
+
+    <div class="toolbar">
+      <span class="label">편집</span>
+      <button id="btn-delete">✂️ 선택 구간 삭제</button>
+      <button id="btn-crop">📌 선택 구간만 남기기</button>
+      <button id="btn-silence">🔇 무음 처리</button>
+      <button id="btn-fadein">📈 페이드 인</button>
+      <button id="btn-fadeout">📉 페이드 아웃</button>
+      <button id="btn-normalize">🎚 음량 최적화</button>
+      <button id="btn-undo">↩️ 실행 취소</button>
+    </div>
+
+    <div class="toolbar">
+      <span class="label">볼륨</span>
+      <input type="range" id="volslider" min="0" max="200" value="100" style="flex:1;min-width:120px;max-width:300px">
+      <span id="volval">100%</span>
+      <button id="btn-volume">볼륨 적용</button>
+    </div>
+
+    <div class="toolbar">
+      <span class="label">저장</span>
+      <select id="bitrate">
+        <option value="128">MP3 음질: 128 kbps (보통)</option>
+        <option value="192" selected>MP3 음질: 192 kbps (좋음)</option>
+        <option value="320">MP3 음질: 320 kbps (최고)</option>
+      </select>
+      <button id="btn-mp3" class="green">⬇ MP3로 저장</button>
+      <button id="btn-wav">⬇ WAV로 저장</button>
+    </div>
+
+    <div id="progresswrap">
+      <div id="progressouter"><div id="progressbar"></div></div>
+      <div id="progresstext"></div>
+    </div>
+
+    <div id="hint">
+      💡 <b>사용 팁</b> &nbsp;·&nbsp; 파형을 <b>클릭</b>하면 재생 위치가 이동하고, <b>드래그</b>하면 구간이 선택됩니다.
+      &nbsp;·&nbsp; <kbd>스페이스</kbd> 재생/정지 &nbsp;·&nbsp; <kbd>⌫ 삭제</kbd> 선택 구간 삭제 &nbsp;·&nbsp; <kbd>⌘Z</kbd> 실행 취소
+      &nbsp;·&nbsp; 구간을 선택하지 않으면 볼륨·페이드·무음은 전체에 적용됩니다.
+    </div>
+  </div>
+</main>
+
+<footer>이 프로그램은 오픈소스 MP3 인코더 <a href="https://github.com/zhuker/lamejs" target="_blank">lamejs</a>(LGPL)를 사용합니다. 모든 처리는 내 컴퓨터 안에서만 이루어지며, 파일이 인터넷으로 전송되지 않습니다.</footer>
+
+<script src="lame.min.js"></script>
+<script>
+"use strict";
+
+// ---------- 상태 ----------
+let actx = null;            // AudioContext (재생용)
+let channels = [];          // 채널별 Float32Array (편집 대상 원본 데이터)
+let sampleRate = 44100;
+let fileName = "";
+let selStart = null, selEnd = null; // 선택 구간 (초)
+let cursor = 0;             // 재생 시작 위치 (초)
+let playState = null;       // { source, ctxStart, offset, endAt }
+let undoStack = [];
+const UNDO_LIMIT = 10;
+
+const $ = (id) => document.getElementById(id);
+const dropzone = $("dropzone"), editor = $("editor");
+const canvas = $("wave"), wavewrap = $("wavewrap");
+const ctx2d = canvas.getContext("2d");
+
+// ---------- 유틸 ----------
+function duration() { return channels.length ? channels[0].length / sampleRate : 0; }
+function fmt(t) {
+  if (!isFinite(t) || t < 0) t = 0;
+  const m = Math.floor(t / 60), s = t - m * 60;
+  return m + ":" + (s < 10 ? "0" : "") + s.toFixed(1);
+}
+function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
+function hasSelection() { return selStart !== null && selEnd !== null && Math.abs(selEnd - selStart) > 0.005; }
+function selRange() { // 샘플 단위 [start, end)
+  const a = Math.min(selStart, selEnd), b = Math.max(selStart, selEnd);
+  return [Math.floor(a * sampleRate), Math.min(channels[0].length, Math.ceil(b * sampleRate))];
+}
+// 선택이 없으면 전체를 대상으로
+function targetRange() {
+  return hasSelection() ? selRange() : [0, channels[0].length];
+}
+
+// ---------- 파일 열기 ----------
+dropzone.addEventListener("click", () => $("fileinput").click());
+$("fileinput").addEventListener("change", (e) => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+$("btn-newfile").addEventListener("click", () => $("fileinput").click());
+["dragover", "dragenter"].forEach(ev => dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.add("drag"); }));
+["dragleave", "drop"].forEach(ev => dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.remove("drag"); }));
+dropzone.addEventListener("drop", (e) => { if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+
+async function loadFile(file) {
+  try {
+    stopPlayback();
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+    dropzone.firstElementChild.textContent = "⏳";
+    const buf = await file.arrayBuffer();
+    const decoded = await new Promise((res, rej) => actx.decodeAudioData(buf, res, rej));
+    channels = [];
+    const nch = Math.min(2, decoded.numberOfChannels);
+    for (let c = 0; c < nch; c++) channels.push(new Float32Array(decoded.getChannelData(c)));
+    sampleRate = decoded.sampleRate;
+    fileName = file.name;
+    selStart = selEnd = null; cursor = 0; undoStack = [];
+    $("fname").textContent = fileName;
+    updateMeta();
+    dropzone.style.display = "none";
+    editor.style.display = "block";
+    resizeCanvas();
+    updateTimebar();
+  } catch (err) {
+    dropzone.firstElementChild.textContent = "🎧";
+    alert("파일을 열 수 없습니다. 지원되는 오디오 파일인지 확인해 주세요.\n(" + err + ")");
+  }
+}
+function updateMeta() {
+  $("fmeta").textContent = fmt(duration()) + " · " + (channels.length === 2 ? "스테레오" : "모노") + " · " + (sampleRate / 1000) + "kHz";
+}
+
+// ---------- 파형 그리기 ----------
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.floor(wavewrap.clientWidth * dpr);
+  canvas.height = Math.floor(220 * dpr);
+  draw();
+}
+window.addEventListener("resize", resizeCanvas);
+
+function draw() {
+  if (!channels.length) return;
+  const W = canvas.width, H = canvas.height;
+  ctx2d.clearRect(0, 0, W, H);
+  const data = channels[0], N = data.length;
+  const step = N / W;
+  const mid = H / 2, amp = H / 2 - 4;
+
+  // 파형 (픽셀당 최소/최대)
+  ctx2d.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--wave").trim() || "#5aa2ff";
+  for (let x = 0; x < W; x++) {
+    let lo = 1, hi = -1;
+    const s0 = Math.floor(x * step), s1 = Math.min(N, Math.floor((x + 1) * step) + 1);
+    for (let i = s0; i < s1; i += Math.max(1, Math.floor((s1 - s0) / 50))) {
+      const v = data[i];
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+    const y1 = mid - hi * amp, y2 = mid - lo * amp;
+    ctx2d.fillRect(x, y1, 1, Math.max(1, y2 - y1));
+  }
+  // 중앙선
+  ctx2d.fillStyle = "rgba(255,255,255,0.15)";
+  ctx2d.fillRect(0, mid, W, 1);
+
+  // 선택 구간
+  if (hasSelection()) {
+    const a = Math.min(selStart, selEnd) / duration() * W;
+    const b = Math.max(selStart, selEnd) / duration() * W;
+    ctx2d.fillStyle = "rgba(79,140,255,0.28)";
+    ctx2d.fillRect(a, 0, b - a, H);
+    ctx2d.fillStyle = "#4f8cff";
+    ctx2d.fillRect(a, 0, 2, H);
+    ctx2d.fillRect(b - 2, 0, 2, H);
+  }
+
+  // 재생 커서
+  const t = playState ? currentPlayTime() : cursor;
+  const cx = clamp(t / duration(), 0, 1) * W;
+  ctx2d.fillStyle = "#37c993";
+  ctx2d.fillRect(cx - 1, 0, 2.5, H);
+}
+
+// ---------- 마우스 선택 ----------
+let dragging = false, dragStartX = 0;
+function xToTime(clientX) {
+  const r = canvas.getBoundingClientRect();
+  return clamp((clientX - r.left) / r.width, 0, 1) * duration();
+}
+canvas.addEventListener("mousedown", (e) => {
+  dragging = true; dragStartX = e.clientX;
+  selStart = xToTime(e.clientX); selEnd = selStart;
+  draw();
+});
+window.addEventListener("mousemove", (e) => {
+  if (!dragging) return;
+  selEnd = xToTime(e.clientX);
+  draw(); updateTimebar();
+});
+window.addEventListener("mouseup", (e) => {
+  if (!dragging) return;
+  dragging = false;
+  if (Math.abs(e.clientX - dragStartX) < 4) { // 클릭: 커서 이동
+    cursor = xToTime(e.clientX);
+    selStart = selEnd = null;
+  }
+  draw(); updateTimebar();
+});
+
+function updateTimebar() {
+  const t = playState ? currentPlayTime() : cursor;
+  $("postext").textContent = fmt(t) + " / " + fmt(duration());
+  $("seltext").textContent = hasSelection()
+    ? "선택: " + fmt(Math.min(selStart, selEnd)) + " ~ " + fmt(Math.max(selStart, selEnd)) + " (" + fmt(Math.abs(selEnd - selStart)) + ")"
+    : "파형을 드래그하면 구간이 선택됩니다";
+}
+
+// ---------- 재생 ----------
+function makeBuffer() {
+  const b = actx.createBuffer(channels.length, channels[0].length, sampleRate);
+  for (let c = 0; c < channels.length; c++) b.copyToChannel(channels[c], c);
+  return b;
+}
+function currentPlayTime() {
+  if (!playState) return cursor;
+  return playState.offset + (actx.currentTime - playState.ctxStart);
+}
+function startPlayback(from, to) {
+  stopPlayback();
+  if (actx.state === "suspended") actx.resume();
+  const source = actx.createBufferSource();
+  source.buffer = makeBuffer();
+  source.connect(actx.destination);
+  const dur = (to !== undefined ? to : duration()) - from;
+  if (dur <= 0) return;
+  source.start(0, from, dur);
+  playState = { source, ctxStart: actx.currentTime, offset: from, endAt: from + dur };
+  source.onended = () => {
+    if (playState && playState.source === source) {
+      cursor = playState.endAt >= duration() - 0.05 ? 0 : playState.endAt;
+      playState = null;
+      $("btn-play").textContent = "▶ 재생";
+      draw(); updateTimebar();
+    }
+  };
+  $("btn-play").textContent = "⏸ 일시정지";
+  animate();
+}
+function stopPlayback(keepPos) {
+  if (playState) {
+    if (keepPos) cursor = clamp(currentPlayTime(), 0, duration());
+    const s = playState.source;
+    playState = null;
+    try { s.onended = null; s.stop(); } catch (e) {}
+  }
+  $("btn-play").textContent = "▶ 재생";
+}
+function animate() {
+  if (!playState) return;
+  draw(); updateTimebar();
+  requestAnimationFrame(animate);
+}
+$("btn-play").addEventListener("click", () => {
+  if (playState) { stopPlayback(true); draw(); updateTimebar(); }
+  else startPlayback(hasSelection() ? Math.min(selStart, selEnd) : cursor);
+});
+$("btn-stop").addEventListener("click", () => { stopPlayback(false); cursor = hasSelection() ? Math.min(selStart, selEnd) : 0; draw(); updateTimebar(); });
+$("btn-playsel").addEventListener("click", () => {
+  if (!hasSelection()) { alert("먼저 파형에서 구간을 드래그해서 선택해 주세요."); return; }
+  startPlayback(Math.min(selStart, selEnd), Math.max(selStart, selEnd));
+});
+
+// ---------- 편집 ----------
+function pushUndo() {
+  undoStack.push({ channels: channels.map(c => new Float32Array(c)), selStart, selEnd, cursor });
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+}
+function afterEdit() {
+  stopPlayback(false);
+  cursor = clamp(cursor, 0, duration());
+  updateMeta(); draw(); updateTimebar();
+}
+function requireSelection() {
+  if (!hasSelection()) { alert("먼저 파형에서 구간을 드래그해서 선택해 주세요."); return false; }
+  return true;
+}
+
+$("btn-delete").addEventListener("click", doDelete);
+function doDelete() {
+  if (!requireSelection()) return;
+  pushUndo();
+  const [a, b] = selRange();
+  channels = channels.map(c => {
+    const out = new Float32Array(c.length - (b - a));
+    out.set(c.subarray(0, a), 0);
+    out.set(c.subarray(b), a);
+    return out;
+  });
+  cursor = a / sampleRate;
+  selStart = selEnd = null;
+  afterEdit();
+}
+
+$("btn-crop").addEventListener("click", () => {
+  if (!requireSelection()) return;
+  pushUndo();
+  const [a, b] = selRange();
+  channels = channels.map(c => new Float32Array(c.subarray(a, b)));
+  cursor = 0; selStart = selEnd = null;
+  afterEdit();
+});
+
+$("btn-silence").addEventListener("click", () => {
+  pushUndo();
+  const [a, b] = targetRange();
+  channels.forEach(c => c.fill(0, a, b));
+  afterEdit();
+});
+
+$("btn-fadein").addEventListener("click", () => applyFade(true));
+$("btn-fadeout").addEventListener("click", () => applyFade(false));
+function applyFade(fadeIn) {
+  pushUndo();
+  const [a, b] = targetRange(), n = b - a;
+  channels.forEach(c => {
+    for (let i = a; i < b; i++) {
+      const p = (i - a) / n;
+      c[i] *= fadeIn ? p : 1 - p;
+    }
+  });
+  afterEdit();
+}
+
+$("btn-normalize").addEventListener("click", () => {
+  pushUndo();
+  const [a, b] = targetRange();
+  let peak = 0;
+  channels.forEach(c => { for (let i = a; i < b; i++) { const v = Math.abs(c[i]); if (v > peak) peak = v; } });
+  if (peak > 0.0001) {
+    const g = 0.99 / peak;
+    channels.forEach(c => { for (let i = a; i < b; i++) c[i] *= g; });
+  }
+  afterEdit();
+});
+
+$("volslider").addEventListener("input", () => { $("volval").textContent = $("volslider").value + "%"; });
+$("btn-volume").addEventListener("click", () => {
+  const g = $("volslider").value / 100;
+  pushUndo();
+  const [a, b] = targetRange();
+  channels.forEach(c => { for (let i = a; i < b; i++) c[i] = clamp(c[i] * g, -1, 1); });
+  afterEdit();
+});
+
+$("btn-undo").addEventListener("click", doUndo);
+function doUndo() {
+  const s = undoStack.pop();
+  if (!s) { return; }
+  channels = s.channels; selStart = s.selStart; selEnd = s.selEnd; cursor = s.cursor;
+  afterEdit();
+}
+
+// ---------- 키보드 ----------
+window.addEventListener("keydown", (e) => {
+  if (!channels.length) return;
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.code === "Space") { e.preventDefault(); $("btn-play").click(); }
+  else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); doDelete(); }
+  else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); doUndo(); }
+});
+
+// ---------- 내보내기 ----------
+function setProgress(pct, text) {
+  const wrap = $("progresswrap");
+  if (pct === null) { wrap.style.display = "none"; return; }
+  wrap.style.display = "block";
+  $("progressbar").style.width = pct + "%";
+  $("progresstext").textContent = text;
+}
+function downloadBlob(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+}
+function baseName() { return fileName.replace(/\.[^.]+$/, "") || "audio"; }
+function floatTo16(f32, from, to) {
+  const out = new Int16Array(to - from);
+  for (let i = from; i < to; i++) {
+    const s = clamp(f32[i], -1, 1);
+    out[i - from] = s < 0 ? s * 32768 : s * 32767;
+  }
+  return out;
+}
+
+// WAV 저장
+$("btn-wav").addEventListener("click", () => {
+  const nch = channels.length, N = channels[0].length;
+  const bytesPerSample = 2, blockAlign = nch * bytesPerSample;
+  const buf = new ArrayBuffer(44 + N * blockAlign);
+  const v = new DataView(buf);
+  const wstr = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  wstr(0, "RIFF"); v.setUint32(4, 36 + N * blockAlign, true); wstr(8, "WAVE");
+  wstr(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+  v.setUint16(22, nch, true); v.setUint32(24, sampleRate, true);
+  v.setUint32(28, sampleRate * blockAlign, true); v.setUint16(32, blockAlign, true); v.setUint16(34, 16, true);
+  wstr(36, "data"); v.setUint32(40, N * blockAlign, true);
+  let o = 44;
+  for (let i = 0; i < N; i++) {
+    for (let c = 0; c < nch; c++) {
+      const s = clamp(channels[c][i], -1, 1);
+      v.setInt16(o, s < 0 ? s * 32768 : s * 32767, true);
+      o += 2;
+    }
+  }
+  downloadBlob(new Blob([buf], { type: "audio/wav" }), baseName() + "_편집본.wav");
+});
+
+// MP3 저장 (lamejs, UI가 멈추지 않도록 조각 단위로 인코딩)
+$("btn-mp3").addEventListener("click", () => {
+  if (typeof lamejs === "undefined") {
+    alert("MP3 인코더(lame.min.js)를 찾을 수 없습니다. index.html과 같은 폴더에 lame.min.js가 있는지 확인해 주세요.\nWAV로 저장 기능은 사용할 수 있습니다.");
+    return;
+  }
+  const kbps = parseInt($("bitrate").value, 10);
+  const nch = channels.length, N = channels[0].length;
+  const enc = new lamejs.Mp3Encoder(nch, sampleRate, kbps);
+  const parts = [];
+  const CHUNK = 1152 * 40;
+  let pos = 0;
+  $("btn-mp3").disabled = true; $("btn-wav").disabled = true;
+
+  function step() {
+    const end = Math.min(N, pos + CHUNK);
+    let out;
+    if (nch === 2) out = enc.encodeBuffer(floatTo16(channels[0], pos, end), floatTo16(channels[1], pos, end));
+    else out = enc.encodeBuffer(floatTo16(channels[0], pos, end));
+    if (out.length) parts.push(out);
+    pos = end;
+    setProgress(Math.round(pos / N * 100), "MP3 변환 중… " + Math.round(pos / N * 100) + "%");
+    if (pos < N) setTimeout(step, 0);
+    else {
+      const tail = enc.flush();
+      if (tail.length) parts.push(tail);
+      downloadBlob(new Blob(parts, { type: "audio/mp3" }), baseName() + "_편집본.mp3");
+      setProgress(null);
+      $("btn-mp3").disabled = false; $("btn-wav").disabled = false;
+    }
+  }
+  step();
+});
+</script>
+</body>
+</html>
