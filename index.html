@@ -97,10 +97,14 @@
   #volval { font-size: 12px; color: var(--muted); min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
 
   .clipsec {
-    margin-top: 26px; padding-top: 16px;
+    margin-top: 26px; padding: 16px 0 0 14px;
     border-top: 2px solid #2a2e3a;
+    border-left: 4px solid var(--clipcolor, #333949);
+    border-radius: 4px 0 0 4px;
   }
-  .clipsec .fileinfo b { color: var(--accent2); }
+  .clipsec .fileinfo b { color: var(--clipcolor, var(--accent2)); }
+  .cliporigin { font-size: 12px; color: var(--muted); }
+  .c-rename { padding: 3px 8px; font-size: 12px; }
   .clipsec.dragging { opacity: .65; outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 10px; }
   .drag-handle {
     cursor: grab; color: var(--muted); font-size: 17px;
@@ -182,8 +186,15 @@
       <button id="btn-normalize">🎚 음량 최적화</button>
       <button id="btn-voice">🎤 목소리 강조</button>
       <span class="divider"></span>
-      <button id="btn-toclip">⬇️ 선택을 새 클립으로</button>
-      <button id="btn-joinclips">🔗 클립 이어 붙이기</button>
+      <button id="btn-toclip">⬇️ 새 클립으로</button>
+      <select id="joingap" title="이어 붙일 때 클립 사이에 넣을 무음 길이">
+        <option value="0">무음 없음</option>
+        <option value="0.5">무음 0.5초</option>
+        <option value="1">무음 1초</option>
+        <option value="2">무음 2초</option>
+        <option value="3">무음 3초</option>
+      </select>
+      <button id="btn-joinclips">🔗 이어 붙이기</button>
     </div>
 
     <div class="toolbar">
@@ -222,8 +233,8 @@
       &nbsp;·&nbsp; 구간을 선택하지 않으면 볼륨·페이드·무음은 전체에 적용됩니다.
       &nbsp;·&nbsp; 볼륨 슬라이더는 재생 소리에 바로 반영되고, ‘파일에 적용’을 눌러야 저장에도 반영됩니다.
       &nbsp;·&nbsp; <b>⬇️ 선택을 새 클립으로</b>: 원본은 그대로 두고 선택 부분을 아래 클립으로 복사해 따로 편집·저장합니다. 여러 번 눌러 계속 추가할 수 있어요.
-      &nbsp;·&nbsp; <b>🔗 클립 이어 붙이기</b>: ‘이어 붙이기 포함’에 체크된 클립들을 화면 위에서부터 순서대로 연결한 새 클립을 만듭니다.
-      &nbsp;·&nbsp; 클립 왼쪽 위의 <b>⠿ 손잡이를 드래그</b>하면 클립 순서를 바꿀 수 있습니다.
+      &nbsp;·&nbsp; <b>🔗 이어 붙이기</b>: ‘이어 붙이기 포함’에 체크된 클립들을 화면 위에서부터 순서대로 연결한 새 클립을 만듭니다. 옆의 <b>사이 무음</b>을 고르면 클립 사이마다 그만큼의 조용한 간격이 들어가요.
+      &nbsp;·&nbsp; 클립 왼쪽 위의 <b>⠿ 손잡이를 드래그</b>하면 클립 순서를 바꿀 수 있고, <b>✏️</b>로 클립 이름을 바꿀 수 있습니다. 클립마다 색이 달라 구분하기 쉬워요.
       &nbsp;·&nbsp; 파형의 <b style="color:var(--danger)">빨간 부분</b>은 소리가 최대 한계에 닿아 잘린(클리핑) 곳입니다.
       &nbsp;·&nbsp; 저장 시 Chrome에서는 폴더를 직접 고를 수 있고, 위치 선택을 지원하지 않는 브라우저(Safari 등)는 다운로드 폴더에 저장됩니다.
     </div>
@@ -274,6 +285,7 @@ class WaveEditor {
     this.seltext = cfg.seltext;
     this.metaEl = cfg.metaEl;
     this.playBtn = cfg.playBtn;
+    this.waveColor = cfg.color || "#5aa2ff";
     this.selHint = cfg.selHint || "파형을 드래그하면 구간이 선택됩니다";
 
     this.channels = [];
@@ -377,7 +389,7 @@ class WaveEditor {
         if (v > hi) hi = v;
       }
       if (hi < lo) continue;
-      ctx.fillStyle = (hi >= 0.999 || lo <= -0.999) ? "#ff6b6b" : "#5aa2ff";
+      ctx.fillStyle = (hi >= 0.999 || lo <= -0.999) ? "#ff6b6b" : this.waveColor;
       const y1 = mid - hi * amp, y2 = mid - lo * amp;
       ctx.fillRect(x, y1, 1, Math.max(1, y2 - y1));
     }
@@ -410,7 +422,8 @@ class WaveEditor {
     ctx.clearRect(0, 0, W, H);
     const data = this.channels[0], N = data.length;
     const step = N / W, mid = H / 2, amp = H / 2 - 2;
-    ctx.fillStyle = "#3d5a85";
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = this.waveColor;
     for (let x = 0; x < W; x++) {
       let lo = 1, hi = -1;
       const a = Math.floor(x * step), b = Math.min(N, Math.floor((x + 1) * step) + 1);
@@ -423,6 +436,7 @@ class WaveEditor {
       if (hi < lo) continue;
       ctx.fillRect(x, mid - hi * amp, 1, Math.max(1, (hi - lo) * amp));
     }
+    ctx.globalAlpha = 1;
     // 현재 보고 있는 구간 표시
     const d = this.duration();
     const a = this.viewStart / d * W, b = this.viewEnd / d * W;
@@ -749,16 +763,25 @@ function closeAllClips() {
   while (clipEntries.length) closeClip(clipEntries[0]);
   clipCounter = 0;
 }
-function createClip(chs, sr, base, kind) {
+// 클립마다 돌아가며 배정되는 구분 색 (제목·파형·왼쪽 띠에 사용)
+const CLIP_COLORS = ["#4fd1a1", "#ffb454", "#c792ea", "#ff7eb6", "#5ad1e6", "#dfe86a", "#ff8a65", "#7ea6ff"];
+
+function createClip(chs, sr, base, kind, origin) {
   clipCounter++;
   const label = (kind || "클립") + " " + clipCounter;
   const name = base + "_" + (kind || "클립") + clipCounter;
+  const color = CLIP_COLORS[(clipCounter - 1) % CLIP_COLORS.length];
   const sec = document.createElement("div");
   sec.className = "clipsec";
+  sec.style.setProperty("--clipcolor", color);
   sec.innerHTML = `
     <div class="fileinfo">
       <span class="drag-handle" title="드래그해서 클립 순서 바꾸기">⠿</span>
-      <span>✂️ <b>${label}</b> &nbsp; <span class="clipmeta"></span></span>
+      <span>✂️ <b class="c-name">${label}</b>
+        <button class="c-rename" title="클립 이름 바꾸기">✏️</button>
+        &nbsp; <span class="clipmeta"></span>
+        ${origin ? `<span class="cliporigin"> · ${origin}</span>` : ""}
+      </span>
       <span style="flex:1"></span>
       <label class="joinpick" title="체크된 클립만 '클립 이어 붙이기'에 포함됩니다"><input type="checkbox" class="c-join" checked> 이어 붙이기 포함</label>
       <button class="c-close">✕ 클립 닫기</button>
@@ -793,12 +816,20 @@ function createClip(chs, sr, base, kind) {
     postext: q(".clippos"), seltext: q(".clipsel"),
     metaEl: q(".clipmeta"), playBtn: q(".c-play"),
     selHint: "클립 안에서도 드래그로 구간을 선택할 수 있어요",
+    color,
   });
   const entry = { editor: ed, section: sec };
   clipEntries.push(entry);
   ed.setAudio(chs, sr, name);
   focusedEditor = ed;
   q(".c-close").addEventListener("click", () => closeClip(entry));
+  q(".c-rename").addEventListener("click", () => {
+    const nn = prompt("클립 이름을 입력하세요 (저장할 때 파일 이름으로도 쓰여요)", q(".c-name").textContent);
+    if (nn && nn.trim()) {
+      q(".c-name").textContent = nn.trim();
+      ed.fileName = nn.trim();
+    }
+  });
   q(".c-play").addEventListener("click", () => ed.toggle());
   q(".c-stop").addEventListener("click", () => { ed.stop(false); ed.cursor = 0; ed.draw(); ed.updateTimebar(); });
   q(".c-del").addEventListener("click", () => ed.del());
@@ -810,7 +841,9 @@ function createClip(chs, sr, base, kind) {
   q(".c-redo").addEventListener("click", () => ed.redo());
   q(".c-toclip").addEventListener("click", () => { // 클립에서 다시 새 클립을 만들 수도 있다
     if (!ed.requireSelection()) return;
-    createClip(ed.copyRange(), ed.sampleRate, ed.fileName.replace(/_(클립|합본)\d+$/, ""));
+    const [a, b] = ed.selRange();
+    const origin = q(".c-name").textContent + "의 " + fmt(a / ed.sampleRate) + " ~ " + fmt(b / ed.sampleRate);
+    createClip(ed.copyRange(), ed.sampleRate, ed.fileName.replace(/_(클립|합본)\d+$/, ""), null, origin);
     status("✂️ 선택 구간을 새 클립으로 복사했습니다.");
   });
   q(".c-mp3").addEventListener("click", () => saveAudio(ed.channels, ed.sampleRate, ed.fileName, "mp3"));
@@ -820,7 +853,9 @@ function createClip(chs, sr, base, kind) {
 }
 $("btn-toclip").addEventListener("click", () => {
   if (!main.requireSelection()) return;
-  createClip(main.copyRange(), main.sampleRate, main.fileName.replace(/\.[^.]+$/, ""));
+  const [a, b] = main.selRange();
+  const origin = "원본 " + fmt(a / main.sampleRate) + " ~ " + fmt(b / main.sampleRate);
+  createClip(main.copyRange(), main.sampleRate, main.fileName.replace(/\.[^.]+$/, ""), null, origin);
   status("✂️ 선택 구간을 새 클립으로 복사했습니다. 원본은 그대로예요.");
 });
 
@@ -877,24 +912,28 @@ $("btn-joinclips").addEventListener("click", () => {
     alert("샘플링 주파수가 다른 클립이 섞여 있어 이어 붙일 수 없습니다.");
     return;
   }
+  const gapSec = parseFloat($("joingap").value) || 0;
+  const gapSamples = Math.round(gapSec * sr);
   const nch = Math.max(...list.map(ed => ed.channels.length));
-  const total = list.reduce((s, ed) => s + ed.channels[0].length, 0);
+  const total = list.reduce((s, ed) => s + ed.channels[0].length, 0) + gapSamples * (list.length - 1);
   const chs = [];
   for (let c = 0; c < nch; c++) {
-    const out = new Float32Array(total);
+    const out = new Float32Array(total); // 새 배열은 0(무음)으로 채워져 있어 간격은 건너뛰기만 하면 된다
     let off = 0;
-    for (const ed of list) {
+    list.forEach((ed, i) => {
       // 모노 클립이 섞여 있으면 그 채널을 양쪽에 복사
       const src = ed.channels[Math.min(c, ed.channels.length - 1)];
       out.set(src, off);
       off += src.length;
-    }
+      if (i < list.length - 1) off += gapSamples;
+    });
     chs.push(out);
   }
-  createClip(chs, sr, main.fileName.replace(/\.[^.]+$/, ""), "합본");
+  const originText = "클립 " + list.length + "개 연결" + (gapSec > 0 ? " · 사이 무음 " + gapSec + "초" : "");
+  createClip(chs, sr, main.fileName.replace(/\.[^.]+$/, ""), "합본", originText);
   // 합본이 다음 이어 붙이기에 또 포함되는 실수를 막기 위해 기본은 체크 해제
   clipEntries[clipEntries.length - 1].section.querySelector(".c-join").checked = false;
-  status("🔗 체크된 클립 " + list.length + "개를 순서대로 이어 붙여 새 클립(합본)을 만들었습니다. 아래에서 확인하세요.");
+  status("🔗 체크된 클립 " + list.length + "개를 순서대로 이어 붙였습니다" + (gapSec > 0 ? " (사이마다 무음 " + gapSec + "초)" : "") + ". 아래 합본에서 확인하세요.");
 });
 
 // ---------- 볼륨 (원본 편집기 전용) ----------
