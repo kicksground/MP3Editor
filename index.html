@@ -410,9 +410,17 @@ class WaveEditor {
 
     const t = this.playState ? this.currentPlayTime() : this.cursor;
     const cx = this.timeToX(clamp(t, 0, this.duration()), W);
-    if (cx >= -2 && cx <= W + 2) {
+    if (cx >= -8 && cx <= W + 8) {
+      const dpr = window.devicePixelRatio || 1;
       ctx.fillStyle = "#37c993";
-      ctx.fillRect(cx - 1, 0, 2.5, H);
+      ctx.fillRect(cx - dpr, 0, 2 * dpr, H);
+      // 위쪽 삼각형 표식으로 재생 위치를 더 잘 보이게
+      ctx.beginPath();
+      ctx.moveTo(cx - 6 * dpr, 0);
+      ctx.lineTo(cx + 6 * dpr, 0);
+      ctx.lineTo(cx, 9 * dpr);
+      ctx.closePath();
+      ctx.fill();
     }
     this.drawMinimap();
   }
@@ -554,6 +562,14 @@ class WaveEditor {
     if (this.playBtn) this.playBtn.textContent = "⏸ 일시정지";
     const anim = () => {
       if (!this.playState) return;
+      // 확대 상태에서 재생 위치가 화면 밖으로 나가면 다음 화면으로 자동 이동
+      const t = this.currentPlayTime();
+      if (this.viewEnd - this.viewStart < this.duration() - 0.01 && (t > this.viewEnd || t < this.viewStart)) {
+        const span = this.viewEnd - this.viewStart;
+        this.viewStart = t;
+        this.viewEnd = t + span;
+        this.clampView();
+      }
       this.draw(); this.updateTimebar();
       requestAnimationFrame(anim);
     };
