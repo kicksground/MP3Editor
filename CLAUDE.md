@@ -23,6 +23,10 @@
 - 저장: `saveAudio()` — Chrome은 `showSaveFilePicker`(폴더 선택), 미지원 브라우저는 다운로드 폴백. MP3는 인코딩 전에 저장 위치를 먼저 물어야 함(사용자 제스처 만료 문제).
 - 녹음: `toggleRecord()` — MediaRecorder 사용. 파일 없으면 main으로, 편집 중이면 클립으로. 마이크 선택(`micId`), 녹음 중 실시간 파형 패널(`#recpanel`, AnalyserNode).
 - 주의: 볼륨 적용 시 클리핑 감지·경고, 파형에 클리핑 구간 빨간색 표시 유지할 것.
+- 텍스트 변환(STT): `transcribeAudio()` — 16kHz 모노 리샘플 → lamejs 모노 48kbps MP3 → Gemini
+  generateContent API에 inline_data로 전송. API 키는 localStorage(`mp3editor_gemini_key`)에만 저장
+  (절대 코드/저장소에 넣지 말 것 — 공개 저장소). 모델은 `mp3editor_stt_model`, 기본 gemini-2.5-flash.
+- PWA: manifest.json(file_handlers로 파일 연결) + sw.js(네트워크 우선 캐시) + launchQueue.
 
 ## 테스트 방법 (푸시 전 필수)
 - Playwright 스모크 테스트를 헤드리스 Chromium으로 실행한다. 과거 스크립트는 세션 스크래치패드에 있었으므로 새 세션에서는 다시 작성해야 할 수 있음.
