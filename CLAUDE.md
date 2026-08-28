@@ -24,8 +24,9 @@
 - 녹음: `toggleRecord()` — MediaRecorder 사용. 파일 없으면 main으로, 편집 중이면 클립으로. 마이크 선택(`micId`), 녹음 중 실시간 파형 패널(`#recpanel`, AnalyserNode).
 - 주의: 볼륨 적용 시 클리핑 감지·경고, 파형에 클리핑 구간 빨간색 표시 유지할 것.
 - 텍스트 변환(STT): `transcribeAudio()` — 16kHz 모노 리샘플 → lamejs 모노 48kbps MP3 → Gemini
-  generateContent API에 inline_data로 전송. API 키는 localStorage(`mp3editor_gemini_key`)에만 저장
-  (절대 코드/저장소에 넣지 말 것 — 공개 저장소). 모델은 `mp3editor_stt_model`, 기본 gemini-2.5-flash.
+  전송. 기본 모델 gemini-3.5-transcribe는 Interactions API(POST /v1beta/interactions,
+  input:[{type:audio,data,mime_type}], 응답 output_text), 일반 모델은 generateContent(inline_data).
+  API 키는 localStorage(`mp3editor_gemini_key`)에만 저장 (절대 코드/저장소에 넣지 말 것 — 공개 저장소).
 - PWA: manifest.json(file_handlers로 파일 연결) + sw.js(네트워크 우선 캐시) + launchQueue.
 
 ## 테스트 방법 (푸시 전 필수)
