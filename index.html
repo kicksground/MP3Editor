@@ -129,6 +129,21 @@
   #progressbar { background: var(--accent2); height: 100%; width: 0%; transition: width .1s; }
   #progresstext { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
+  #playlist { display: none; background: var(--panel); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+  #playlist.on { display: block; }
+  #playlist b { color: var(--accent); }
+  #plcount { font-size: 12px; color: var(--muted); }
+  .plitem {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; border-radius: 7px; cursor: pointer; font-size: 13px;
+    color: var(--text);
+  }
+  .plitem:hover { background: var(--panel2); }
+  .plitem.cur { background: rgba(79, 140, 255, .16); }
+  .plitem.cur .plname { color: var(--accent); font-weight: 600; }
+  .plitem .plnum { color: var(--muted); font-size: 12px; min-width: 18px; font-variant-numeric: tabular-nums; }
+  .plitem .plx { margin-left: auto; color: var(--muted); padding: 0 4px; }
+  .plitem .plx:hover { color: var(--danger); }
   #sttresult { display: none; margin-top: 10px; background: var(--panel); border-radius: 10px; padding: 12px; }
   #sttresult.on { display: block; }
   #sttresult b { color: var(--accent2); }
@@ -173,17 +188,25 @@
   <div id="dropzone">
     <span class="big">🎧</span>
     오디오 파일을 여기로 <b>드래그</b>하거나 <b>클릭</b>해서 선택하세요<br>
-    <span style="font-size:13px">MP3 · WAV · M4A · AAC · OGG · 동영상(MP4)의 소리 지원</span>
+    <span style="font-size:13px">MP3 · WAV · M4A · AAC · OGG · 동영상(MP4)의 소리 지원 · <b>여러 개를 한꺼번에</b> 선택하면 재생 목록이 됩니다</span>
     <div style="margin-top:20px"><button id="btn-record-dz">🎙️ 마이크로 바로 녹음하기</button></div>
     <div style="margin-top:10px"><select id="micselect-dz" title="녹음에 사용할 마이크" style="max-width:260px"></select></div>
     <div style="margin-top:8px"><label class="joinpick" style="justify-content:center" title="녹음이 끝나면 소리가 잘리지 않는 한도까지 자동으로 음량을 키웁니다"><input type="checkbox" id="autonorm-dz" checked> 녹음 후 음량 자동 보정</label></div>
-    <input type="file" id="fileinput" accept="audio/*,video/*" hidden>
+    <input type="file" id="fileinput" accept="audio/*,video/*" multiple hidden>
   </div>
 
   <div id="editor">
+    <div id="playlist">
+      <div class="fileinfo" style="margin-bottom:4px">
+        <span>🎵 <b>재생 목록</b> &nbsp; <span id="plcount"></span></span>
+        <label class="joinpick" title="한 곡이 끝나면 자동으로 다음 곡을 재생합니다"><input type="checkbox" id="plauto" checked> 연속 재생</label>
+      </div>
+      <div id="plitems"></div>
+    </div>
+
     <div class="fileinfo">
       <span><b id="fname"></b> &nbsp; <span id="fmeta"></span></span>
-      <button id="btn-newfile">다른 파일 열기</button>
+      <button id="btn-newfile">＋ 파일 열기·추가</button>
     </div>
 
     <div class="wavewrap"><canvas id="wave" class="wave"></canvas></div>
@@ -287,7 +310,8 @@
     <div id="status"></div>
 
     <div id="hint">
-      💡 <b>사용 팁</b> &nbsp;·&nbsp; 파형을 <b>클릭</b>=재생 위치 이동, <b>드래그</b>=구간 선택.
+      💡 <b>사용 팁</b> &nbsp;·&nbsp; 파일을 <b>여러 개 열면 재생 목록</b>이 생깁니다: 곡 이름 클릭=그 곡 재생, ‘연속 재생’ 체크 시 한 곡이 끝나면 자동으로 다음 곡. ‘＋ 파일 열기·추가’로 곡을 더 넣을 수 있어요. 곡을 바꿔도 클립은 그대로 남습니다.
+      &nbsp;·&nbsp; 파형을 <b>클릭</b>=재생 위치 이동, <b>드래그</b>=구간 선택.
       &nbsp;·&nbsp; <kbd>마우스 휠</kbd> 확대/축소, <kbd>Shift+휠</kbd> 좌우 이동, 파형 아래 <b>미니맵을 드래그</b>해도 이동합니다.
       &nbsp;·&nbsp; <kbd>스페이스</kbd> 재생/정지 &nbsp;·&nbsp; <kbd>⌫</kbd> 선택 삭제 &nbsp;·&nbsp; <kbd>⌘Z</kbd> 실행 취소, <kbd>⌘⇧Z</kbd> 다시 실행 (마지막에 클릭한 파형에 적용)
       &nbsp;·&nbsp; 구간을 선택하지 않으면 볼륨·페이드·무음은 전체에 적용됩니다.
@@ -622,10 +646,12 @@ class WaveEditor {
     this.playState = { source, ctxStart: actx.currentTime, offset: from, endAt: from + dur };
     source.onended = () => {
       if (this.playState && this.playState.source === source) {
-        this.cursor = this.playState.endAt >= this.duration() - 0.05 ? 0 : this.playState.endAt;
+        const natural = this.playState.endAt >= this.duration() - 0.05; // 끝까지 다 재생됨
+        this.cursor = natural ? 0 : this.playState.endAt;
         this.playState = null;
         if (this.playBtn) this.playBtn.textContent = "▶ 재생";
         this.draw(); this.updateTimebar();
+        if (natural && this.onPlayEnd) this.onPlayEnd(); // 재생 목록 연속 재생용
       }
     };
     if (this.playBtn) this.playBtn.textContent = "⏸ 일시정지";
@@ -779,16 +805,65 @@ window.addEventListener("resize", () => {
   editors.forEach(ed => { if (ed.channels.length) ed.resize(); });
 });
 
-// ---------- 파일 열기 ----------
+// ---------- 파일 열기 + 재생 목록 ----------
 const dropzone = $("dropzone");
 dropzone.addEventListener("click", () => $("fileinput").click());
-$("fileinput").addEventListener("change", (e) => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+$("fileinput").addEventListener("change", (e) => { openFiles(e.target.files); e.target.value = ""; });
 $("btn-newfile").addEventListener("click", () => $("fileinput").click());
 ["dragover", "dragenter"].forEach(ev => dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.add("drag"); }));
 ["dragleave", "drop"].forEach(ev => dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.remove("drag"); }));
-dropzone.addEventListener("drop", (e) => { if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+dropzone.addEventListener("drop", (e) => { openFiles(e.dataTransfer.files); });
 
-async function loadFile(file) {
+// 재생 목록: 파일 자체만 기억해 두고, 고른 곡만 그때그때 해석한다 (메모리 절약)
+let playlist = [];      // { file }
+let playlistIndex = -1; // 지금 열려 있는 곡 번호
+
+function openFiles(files) {
+  const arr = Array.from(files || []).filter(f =>
+    /^(audio|video)\//.test(f.type) || /\.(mp3|wav|m4a|aac|ogg|flac|mp4|mov|webm)$/i.test(f.name));
+  if (!arr.length) return;
+  const firstNew = playlist.length;
+  arr.forEach(f => playlist.push({ file: f }));
+  renderPlaylist();
+  selectTrack(firstNew, false);
+  if (playlist.length > 1) status("🎵 재생 목록에 " + arr.length + "곡을 추가했습니다. 곡 이름을 클릭하면 그 곡이 열리면서 재생돼요.");
+}
+function selectTrack(i, autoplay) {
+  if (i < 0 || i >= playlist.length) return;
+  playlistIndex = i;
+  renderPlaylist();
+  loadFile(playlist[i].file, autoplay);
+}
+function renderPlaylist() {
+  const panel = $("playlist");
+  panel.classList.toggle("on", playlist.length > 1);
+  $("plcount").textContent = playlist.length ? playlist.length + "곡" : "";
+  const wrap = $("plitems");
+  wrap.innerHTML = "";
+  playlist.forEach((item, i) => {
+    const row = document.createElement("div");
+    row.className = "plitem" + (i === playlistIndex ? " cur" : "");
+    row.innerHTML = `<span class="plnum">${i === playlistIndex ? "▶" : (i + 1)}</span><span class="plname"></span><span class="plx" title="목록에서 빼기">✕</span>`;
+    row.querySelector(".plname").textContent = item.file.name;
+    row.addEventListener("click", () => selectTrack(i, true));
+    row.querySelector(".plx").addEventListener("click", (e) => {
+      e.stopPropagation();
+      playlist.splice(i, 1);
+      if (i === playlistIndex) playlistIndex = -1;
+      else if (i < playlistIndex) playlistIndex--;
+      renderPlaylist();
+    });
+    wrap.appendChild(row);
+  });
+}
+// 한 곡이 끝까지 재생되면 다음 곡으로 (연속 재생이 켜져 있을 때)
+main.onPlayEnd = () => {
+  if ($("plauto").checked && playlistIndex >= 0 && playlistIndex < playlist.length - 1) {
+    selectTrack(playlistIndex + 1, true);
+  }
+};
+
+async function loadFile(file, autoplay) {
   try {
     ensureCtx();
     dropzone.firstElementChild.textContent = "⏳";
@@ -800,11 +875,12 @@ async function loadFile(file) {
     $("fname").textContent = file.name;
     dropzone.style.display = "none";
     $("editor").style.display = "block";
-    closeAllClips();
+    // 클립은 곡을 바꿔도 유지된다 — 여러 곡에서 조각을 모아 이어 붙일 수 있게
     $("volslider").value = 100; $("volval").textContent = "100%";
     main.setAudio(chs, decoded.sampleRate, file.name);
     if (main.gainNode) main.gainNode.gain.value = 1;
     focusedEditor = main;
+    if (autoplay) main.play(0);
   } catch (err) {
     dropzone.firstElementChild.textContent = "🎧";
     alert("파일을 열 수 없습니다. 지원되는 오디오 파일인지 확인해 주세요.\n(" + err + ")");
@@ -1647,8 +1723,9 @@ if ("launchQueue" in window) {
   window.launchQueue.setConsumer(async (params) => {
     if (params.files && params.files.length) {
       try {
-        const f = await params.files[0].getFile();
-        loadFile(f);
+        const files = [];
+        for (const h of params.files) files.push(await h.getFile());
+        openFiles(files);
       } catch (e) {}
     }
   });

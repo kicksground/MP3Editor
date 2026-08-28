@@ -28,6 +28,8 @@
   input:[{type:audio,data,mime_type}], 응답 output_text), 일반 모델은 generateContent(inline_data).
   API 키는 localStorage(`mp3editor_gemini_key`)에만 저장 (절대 코드/저장소에 넣지 말 것 — 공개 저장소).
 - PWA: manifest.json(file_handlers로 파일 연결) + sw.js(네트워크 우선 캐시) + launchQueue.
+- 재생 목록: `playlist`(File 참조만 보관, 선택 시 디코드), `selectTrack(i, autoplay)`, 연속 재생은
+  main.onPlayEnd(끝까지 재생 시에만 호출). 곡을 바꿔도 클립은 유지된다(교차 곡 클립 워크플로).
 
 ## 테스트 방법 (푸시 전 필수)
 - Playwright 스모크 테스트를 헤드리스 Chromium으로 실행한다. 과거 스크립트는 세션 스크래치패드에 있었으므로 새 세션에서는 다시 작성해야 할 수 있음.
